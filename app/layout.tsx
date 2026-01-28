@@ -16,9 +16,20 @@ const lora = Lora({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://straude.com"),
   title: "Straude",
   description:
     "Strava for Claude Code. Track your AI coding sessions, share progress with friends, and compete on leaderboards.",
+  openGraph: {
+    title: "Straude",
+    description: "Strava for Claude Code. Track your AI coding sessions, share progress with friends, and compete on leaderboards.",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Straude",
+    description: "Strava for Claude Code. Track your AI coding sessions, share progress with friends, and compete on leaderboards.",
+  },
 };
 
 export default function RootLayout({
