@@ -135,7 +135,7 @@ function CompeteCard() {
 
 function HeroBackground() {
   return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none select-none">
+    <div className="fixed inset-0 overflow-hidden pointer-events-none select-none">
       {/* Background Image */}
       <Image
         src="/hero-bg.jpg"
@@ -156,7 +156,7 @@ export default function Home() {
   const [showBadge, setShowBadge] = useState(true);
 
   return (
-    <div className="relative flex h-dvh flex-col overflow-hidden bg-dark text-light selection:bg-accent selection:text-light">
+    <div className="relative flex min-h-dvh flex-col bg-dark text-light selection:bg-accent selection:text-light overflow-x-hidden">
       <HeroBackground />
 
       <main className="relative z-20 flex flex-1 flex-col items-center justify-start pt-20 sm:justify-center sm:pt-0 px-4 sm:px-8">
@@ -228,7 +228,7 @@ export default function Home() {
            initial={{ opacity: 0 }}
            animate={{ opacity: showBadge ? 1 : 0 }}
            transition={{ duration: showBadge ? 1 : 0.3, delay: showBadge ? 1.5 : 0 }}
-           className="absolute bottom-8 sm:bottom-12 flex flex-col items-center gap-3"
+           className="mt-12 mb-8 sm:mt-16 sm:mb-12 flex flex-col items-center gap-3"
            style={{ pointerEvents: showBadge ? "auto" : "none" }}
         >
            <button
