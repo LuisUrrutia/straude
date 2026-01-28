@@ -70,7 +70,7 @@ function ShareCard() {
       {/* Content */}
       <div className="relative mt-2 grow rounded-lg bg-black/20 p-3">
          <p className="font-body text-xs italic text-light/90 leading-relaxed">
-           "Just vibed out a full Stripe integration in 47 mins 🔥"
+           "Claude just oneshotted our whole billing system. Sunday well spent ☕"
          </p>
       </div>
 
@@ -119,7 +119,7 @@ function CompeteCard() {
           <div className="flex items-center gap-2 rounded bg-accent/20 px-2 py-1 text-[10px] text-light border-l-2 border-accent">
              <span className="w-4 font-mono font-bold">#7</span>
              <span className="font-bold">@ohong</span>
-             <span className="ml-auto font-mono font-bold">$26.67</span>
+             <span className="ml-auto font-mono font-bold">🔥 $26.67</span>
           </div>
           <div className="flex items-center gap-2 rounded px-2 py-1 text-[10px] text-gray/50">
              <span className="w-4 font-mono">#8</span>
@@ -159,7 +159,7 @@ export default function Home() {
     <div className="relative flex h-dvh flex-col overflow-hidden bg-dark text-light selection:bg-accent selection:text-light">
       <HeroBackground />
 
-      <main className="relative z-20 flex flex-1 flex-col items-center justify-center px-4 sm:px-8">
+      <main className="relative z-20 flex flex-1 flex-col items-center justify-start pt-20 sm:justify-center sm:pt-0 px-4 sm:px-8">
         
         {/* Hero Text */}
         <div className="flex flex-col items-center text-center">

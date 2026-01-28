@@ -8,7 +8,6 @@ export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
 export default async function Image() {
-  // Load the hero background image
   const imageData = await readFile(join(process.cwd(), "public/hero-bg.jpg"));
   const base64Image = `data:image/jpeg;base64,${imageData.toString("base64")}`;
 
@@ -37,22 +36,12 @@ export default async function Image() {
           }}
         />
 
-        {/* Dark overlay */}
+        {/* Strong dark overlay for contrast */}
         <div
           style={{
             position: "absolute",
             inset: 0,
-            backgroundColor: "rgba(17, 17, 17, 0.7)",
-          }}
-        />
-
-        {/* Gradient overlay */}
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            background:
-              "linear-gradient(to top, rgba(17, 17, 17, 1), rgba(17, 17, 17, 0.5), rgba(17, 17, 17, 0.3))",
+            backgroundColor: "rgba(0, 0, 0, 0.65)",
           }}
         />
 
@@ -65,54 +54,52 @@ export default async function Image() {
             justifyContent: "center",
             position: "relative",
             zIndex: 10,
+            padding: 40,
           }}
         >
-          {/* Title */}
+          {/* Title with strong shadow */}
           <div
             style={{
-              fontSize: 140,
-              fontWeight: 800,
-              letterSpacing: "-0.02em",
-              color: "#F5F5F5",
-              textShadow: "0 4px 30px rgba(198, 96, 63, 0.4)",
+              fontSize: 180,
+              fontWeight: 900,
+              letterSpacing: "-0.03em",
+              color: "#FFFFFF",
+              textShadow: "0 4px 40px rgba(0, 0, 0, 0.8), 0 2px 10px rgba(0, 0, 0, 0.9)",
+              lineHeight: 1,
             }}
           >
             STRAUDE
           </div>
 
-          {/* Tagline */}
+          {/* Tagline - clear and simple */}
           <div
             style={{
-              fontSize: 36,
-              color: "#A3A3A3",
-              marginTop: 16,
+              fontSize: 48,
+              fontWeight: 600,
+              color: "#FFFFFF",
+              marginTop: 24,
+              textShadow: "0 2px 20px rgba(0, 0, 0, 0.8)",
               display: "flex",
               alignItems: "center",
-              gap: 4,
+              gap: 12,
             }}
           >
-            <span
-              style={{
-                color: "#F5F5F5",
-                fontWeight: 500,
-                borderBottom: "2px solid rgba(198, 96, 63, 0.5)",
-                paddingBottom: 2,
-              }}
-            >
-              Stra
-            </span>
-            <span>va for Cl</span>
-            <span
-              style={{
-                color: "#F5F5F5",
-                fontWeight: 500,
-                borderBottom: "2px solid rgba(198, 96, 63, 0.5)",
-                paddingBottom: 2,
-              }}
-            >
-              aude
-            </span>
-            <span> Code</span>
+            <span style={{ color: "#FC4C02" }}>Strava</span>
+            <span style={{ color: "rgba(255,255,255,0.7)" }}>for</span>
+            <span style={{ color: "#D97757" }}>Claude Code</span>
+          </div>
+
+          {/* Hook/CTA */}
+          <div
+            style={{
+              fontSize: 28,
+              color: "rgba(255, 255, 255, 0.85)",
+              marginTop: 32,
+              textShadow: "0 2px 10px rgba(0, 0, 0, 0.7)",
+              fontWeight: 400,
+            }}
+          >
+            Track sessions • Share progress • Compete with friends
           </div>
         </div>
       </div>
