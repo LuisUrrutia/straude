@@ -12,7 +12,7 @@ export function RankBadge({ rank, size = 'md' }: RankBadgeProps) {
   return (
     <span
       className={clsx(
-        'inline-flex items-center justify-center font-heading font-bold rounded',
+        'inline-flex items-center justify-center font-heading font-bold border border-dark rounded-none',
         {
           'min-w-[32px] h-7 px-2.5 text-sm': size === 'md',
           'min-w-[24px] h-5 px-1.5 text-xs': size === 'sm',

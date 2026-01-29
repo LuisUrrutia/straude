@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { createClient } from '@/lib/supabase/server';
 import { usageSubmitSchema } from '@/lib/validators/usage';
+import { getBearerToken, verifyCliToken } from '@/lib/auth/cli';
 
 interface UsageRow {
   id: string;
@@ -15,9 +16,16 @@ interface PostRow {
 }
 
 export async function POST(request: NextRequest) {
-  const { userId } = await auth();
+  const { userId: clerkId } = await auth();
+  const bearerToken = getBearerToken(request);
 
-  if (!userId) {
+  if (!clerkId && bearerToken && !process.env.CLI_JWT_SECRET) {
+    return NextResponse.json({ error: 'CLI auth not configured' }, { status: 500 });
+  }
+
+  const cliAuth = !clerkId && bearerToken ? await verifyCliToken(bearerToken) : null;
+
+  if (!clerkId && !cliAuth) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -32,6 +40,14 @@ export async function POST(request: NextRequest) {
   }
 
   const { date, data, source } = parsed.data;
+  const authType = clerkId ? 'clerk' : 'cli';
+
+  if (source === 'cli' && authType !== 'cli') {
+    return NextResponse.json({ error: 'CLI auth required' }, { status: 403 });
+  }
+  if (source === 'web' && authType !== 'clerk') {
+    return NextResponse.json({ error: 'Web auth required' }, { status: 403 });
+  }
 
   // Validate date is recent (allow today or yesterday to handle timezone differences)
   const now = new Date();
@@ -48,11 +64,11 @@ export async function POST(request: NextRequest) {
 
   const supabase = await createClient();
 
-  // Get user from clerk_id
+  // Resolve user
   const { data: userData, error: userError } = await supabase
     .from('users')
     .select('id')
-    .eq('clerk_id', userId)
+    .eq(authType === 'clerk' ? 'clerk_id' : 'id', authType === 'clerk' ? clerkId! : cliAuth!.userId)
     .single();
 
   const user = userData as { id: string } | null;
@@ -74,7 +90,7 @@ export async function POST(request: NextRequest) {
         cache_read_tokens: data.cacheReadTokens,
         total_tokens: data.totalTokens,
         models: data.models,
-        is_verified: source === 'cli',
+        is_verified: authType === 'cli',
       } as never,
       {
         onConflict: 'user_id,date',

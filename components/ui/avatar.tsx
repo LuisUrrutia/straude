@@ -22,7 +22,7 @@ export function Avatar({ src, alt, size = 'md', className }: AvatarProps) {
   return (
     <div
       className={clsx(
-        'relative rounded-full overflow-hidden bg-sand border-2 border-light shadow-sm flex-shrink-0',
+        'relative rounded-full overflow-hidden bg-sand border-2 border-dark flex-shrink-0',
         className
       )}
       style={{ width: dimension, height: dimension }}

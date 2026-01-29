@@ -84,7 +84,7 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-xl mx-auto">
-      <h1 className="font-heading text-2xl font-bold text-dark mb-6">Settings</h1>
+      <h1 className="type-display-condensed text-2xl text-dark mb-6">Settings</h1>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Avatar */}
@@ -95,7 +95,7 @@ export default function SettingsPage() {
             size="lg"
           />
           <div>
-            <p className="font-heading font-semibold text-dark">@{user?.username}</p>
+            <p className="type-mono-look text-dark">@{user?.username}</p>
             <p className="text-sm text-gray">
               Avatar is managed through Clerk. Update in account settings.
             </p>
@@ -104,7 +104,7 @@ export default function SettingsPage() {
 
         {/* Display Name */}
         <div>
-          <label className="block font-heading text-sm font-medium text-dark mb-2">
+          <label className="type-mono-look text-dark mb-2">
             Display Name
           </label>
           <input
@@ -112,13 +112,13 @@ export default function SettingsPage() {
             value={formData.display_name}
             onChange={(e) => setFormData((prev) => ({ ...prev, display_name: e.target.value }))}
             placeholder="Your name"
-            className="w-full px-4 py-3 border border-gray rounded-lg font-body text-dark placeholder:text-gray/50 focus:border-slate-blue focus:ring-2 focus:ring-slate-blue/20 outline-none transition-all"
+            className="input-brutal"
           />
         </div>
 
         {/* Bio */}
         <div>
-          <label className="block font-heading text-sm font-medium text-dark mb-2">
+          <label className="type-mono-look text-dark mb-2">
             Bio
           </label>
           <textarea
@@ -127,7 +127,7 @@ export default function SettingsPage() {
             placeholder="Tell us about yourself..."
             maxLength={160}
             rows={3}
-            className="w-full px-4 py-3 border border-gray rounded-lg font-body text-dark placeholder:text-gray/50 focus:border-slate-blue focus:ring-2 focus:ring-slate-blue/20 outline-none transition-all resize-none"
+            className="input-brutal resize-none"
           />
           <p className="text-right text-xs text-gray mt-1">
             {formData.bio.length}/160
@@ -136,7 +136,7 @@ export default function SettingsPage() {
 
         {/* Link */}
         <div>
-          <label className="block font-heading text-sm font-medium text-dark mb-2">
+          <label className="type-mono-look text-dark mb-2">
             Website
           </label>
           <input
@@ -144,19 +144,19 @@ export default function SettingsPage() {
             value={formData.link}
             onChange={(e) => setFormData((prev) => ({ ...prev, link: e.target.value }))}
             placeholder="https://your-website.com"
-            className="w-full px-4 py-3 border border-gray rounded-lg font-body text-dark placeholder:text-gray/50 focus:border-slate-blue focus:ring-2 focus:ring-slate-blue/20 outline-none transition-all"
+            className="input-brutal"
           />
         </div>
 
         {/* Country */}
         <div>
-          <label className="block font-heading text-sm font-medium text-dark mb-2">
+          <label className="type-mono-look text-dark mb-2">
             Country
           </label>
           <select
             value={formData.country}
             onChange={(e) => setFormData((prev) => ({ ...prev, country: e.target.value }))}
-            className="w-full px-4 py-3 border border-gray rounded-lg font-body text-dark focus:border-slate-blue focus:ring-2 focus:ring-slate-blue/20 outline-none transition-all"
+            className="input-brutal"
           >
             {countries.map((country) => (
               <option key={country.code} value={country.code}>
@@ -168,7 +168,7 @@ export default function SettingsPage() {
 
         {/* Visibility */}
         <div>
-          <label className="block font-heading text-sm font-medium text-dark mb-2">
+          <label className="type-mono-look text-dark mb-2">
             Profile Visibility
           </label>
           <div className="space-y-2">
@@ -180,7 +180,7 @@ export default function SettingsPage() {
                 className="size-4 text-accent"
               />
               <div>
-                <span className="font-heading font-medium text-dark">Public</span>
+                <span className="type-display-condensed text-sm text-dark">Public</span>
                 <p className="text-sm text-gray">Visible on leaderboards</p>
               </div>
             </label>
@@ -192,7 +192,7 @@ export default function SettingsPage() {
                 className="size-4 text-accent"
               />
               <div>
-                <span className="font-heading font-medium text-dark">Private</span>
+                <span className="type-display-condensed text-sm text-dark">Private</span>
                 <p className="text-sm text-gray">Hidden from leaderboards</p>
               </div>
             </label>
@@ -200,7 +200,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Submit */}
-        <Button type="submit" disabled={isSaving} className="w-full">
+        <Button type="submit" disabled={isSaving} className="w-full justify-center">
           {isSaving ? 'Saving...' : 'Save Changes'}
         </Button>
       </form>

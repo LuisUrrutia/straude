@@ -15,9 +15,10 @@ interface ProfileHeaderProps {
 
 export function ProfileHeader({ user }: ProfileHeaderProps) {
   const country = getCountryByCode(user.country);
+  const statsVisible = user.stats_visible;
 
   return (
-    <div className="bg-light border border-sand rounded-xl p-6">
+    <div className="panel-brutal p-6">
       {/* Top section */}
       <div className="flex flex-col sm:flex-row gap-6">
         {/* Avatar */}
@@ -30,10 +31,10 @@ export function ProfileHeader({ user }: ProfileHeaderProps) {
 
         {/* Info */}
         <div className="flex-1 text-center sm:text-left">
-          <h1 className="font-heading text-2xl font-bold text-dark">
+          <h1 className="font-heading text-2xl text-dark">
             {user.display_name || user.username}
           </h1>
-          <p className="text-gray">@{user.username}</p>
+          <p className="type-mono-look text-gray">@{user.username}</p>
 
           {user.bio && (
             <p className="mt-3 font-body text-dark">{user.bio}</p>
@@ -52,7 +53,7 @@ export function ProfileHeader({ user }: ProfileHeaderProps) {
                 href={user.link}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1 text-slate-blue hover:underline"
+                className="flex items-center gap-1 text-accent-purple hover:underline"
               >
                 <LinkIcon className="size-4" />
                 {user.link.replace(/^https?:\/\//, '').replace(/\/$/, '')}
@@ -72,7 +73,7 @@ export function ProfileHeader({ user }: ProfileHeaderProps) {
           </div>
 
           {/* Follow counts */}
-          <div className="mt-4 flex justify-center sm:justify-start gap-4">
+          <div className="mt-4 flex justify-center sm:justify-start gap-4 type-mono-look">
             <Link
               href={`/u/${user.username}/followers`}
               className="hover:text-accent"
@@ -110,39 +111,39 @@ export function ProfileHeader({ user }: ProfileHeaderProps) {
       </div>
 
       {/* Stats cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-6 border-t border-sand">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-6 border-t border-dark">
         <div className="text-center">
           <div className="flex items-center justify-center gap-1 text-accent mb-1">
             <Globe className="size-4" />
           </div>
-          <div className="font-heading text-xl font-bold text-dark">
-            {user.stats.global_rank ? `#${user.stats.global_rank}` : '-'}
+          <div className="type-display-condensed text-xl text-dark">
+            {statsVisible && user.stats.global_rank ? `#${user.stats.global_rank}` : '—'}
           </div>
-          <div className="text-xs text-gray">Global Rank</div>
+          <div className="type-mono-look text-gray">Global Rank</div>
         </div>
         <div className="text-center">
           <div className="flex items-center justify-center gap-1 text-accent mb-1">
             <Trophy className="size-4" />
           </div>
-          <div className="font-heading text-xl font-bold text-dark">
-            {user.stats.regional_rank ? `#${user.stats.regional_rank}` : '-'}
+          <div className="type-display-condensed text-xl text-dark">
+            {statsVisible && user.stats.regional_rank ? `#${user.stats.regional_rank}` : '—'}
           </div>
-          <div className="text-xs text-gray">Regional Rank</div>
+          <div className="type-mono-look text-gray">Regional Rank</div>
         </div>
         <div className="text-center">
           <div className="flex items-center justify-center gap-1 text-accent mb-1">
             <Flame className="size-4" />
           </div>
-          <div className="font-heading text-xl font-bold text-dark">
-            {user.stats.current_streak}
+          <div className="type-display-condensed text-xl text-dark">
+            {statsVisible && user.stats.current_streak !== null ? user.stats.current_streak : '—'}
           </div>
-          <div className="text-xs text-gray">Day Streak</div>
+          <div className="type-mono-look text-gray">Day Streak</div>
         </div>
         <div className="text-center">
-          <div className="font-mono text-xl font-bold text-dark">
-            {formatCurrency(user.stats.total_spent)}
+          <div className="type-display-condensed text-xl text-dark">
+            {statsVisible && user.stats.total_spent !== null ? formatCurrency(user.stats.total_spent) : 'PRIVATE'}
           </div>
-          <div className="text-xs text-gray">All-time Spent</div>
+          <div className="type-mono-look text-gray">All-time Spent</div>
         </div>
       </div>
     </div>

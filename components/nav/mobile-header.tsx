@@ -1,6 +1,6 @@
 'use client';
 
-import { useUser } from '@clerk/nextjs';
+import { useEffect, useState } from 'react';
 
 interface MobileHeaderProps {
   streak?: number;
@@ -8,14 +8,23 @@ interface MobileHeaderProps {
 }
 
 export function MobileHeader({ streak = 0, totalTokens = '--' }: MobileHeaderProps) {
-  const { user } = useUser();
+  const [timeString, setTimeString] = useState('--:--:--');
 
-  const now = new Date();
-  const timeString = now.toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
+  useEffect(() => {
+    const update = () => {
+      const now = new Date();
+      setTimeString(
+        now.toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        })
+      );
+    };
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <header className="bg-accent-orange p-4 border-b border-dark flex flex-col min-h-[200px]">

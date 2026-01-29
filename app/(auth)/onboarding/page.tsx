@@ -175,7 +175,7 @@ export default function OnboardingPage() {
             {(['username', 'country', 'visibility', 'optional'] as Step[]).map((s, i) => (
               <div
                 key={s}
-                className={`h-1 flex-1 mx-1 rounded-full transition-colors ${
+                className={`h-1 flex-1 mx-1 rounded-none transition-colors ${
                   i <= ['username', 'country', 'visibility', 'optional'].indexOf(step)
                     ? 'bg-accent'
                     : 'bg-sand'
@@ -186,13 +186,13 @@ export default function OnboardingPage() {
         </div>
 
         {/* Step Content */}
-        <div className="bg-light border border-sand rounded-xl p-6 shadow-lg">
+        <div className="panel-brutal p-6">
           {step === 'username' && (
             <div>
-              <h1 className="font-heading text-2xl font-bold text-dark mb-2">
+              <h1 className="type-display-condensed text-2xl text-dark mb-2">
                 Choose your username
               </h1>
-              <p className="font-body text-gray mb-6">
+              <p className="text-sm text-gray mb-6">
                 This is how others will find you on Straude.
               </p>
               <div className="relative">
@@ -202,7 +202,8 @@ export default function OnboardingPage() {
                   value={formData.username}
                   onChange={(e) => setFormData((prev) => ({ ...prev, username: e.target.value }))}
                   placeholder="username"
-                  className="w-full pl-8 pr-4 py-3 border border-gray rounded-lg font-body text-dark placeholder:text-gray/50 focus:border-slate-blue focus:ring-2 focus:ring-slate-blue/20 outline-none transition-all"
+                  className="input-brutal"
+                  style={{ paddingLeft: '2rem', paddingRight: '1rem' }}
                   autoFocus
                 />
               </div>
@@ -213,17 +214,17 @@ export default function OnboardingPage() {
                 <p className="mt-2 text-sm text-gray">Checking availability...</p>
               )}
               {formData.username && !usernameError && !isCheckingUsername && (
-                <p className="mt-2 text-sm text-sage">Username is available!</p>
+                <p className="mt-2 text-sm text-success">Username is available!</p>
               )}
             </div>
           )}
 
           {step === 'country' && (
             <div>
-              <h1 className="font-heading text-2xl font-bold text-dark mb-2">
+              <h1 className="type-display-condensed text-2xl text-dark mb-2">
                 Where are you from?
               </h1>
-              <p className="font-body text-gray mb-6">
+              <p className="text-sm text-gray mb-6">
                 This determines your regional leaderboard.
               </p>
               <input
@@ -231,13 +232,13 @@ export default function OnboardingPage() {
                 value={countrySearch}
                 onChange={(e) => setCountrySearch(e.target.value)}
                 placeholder="Search countries..."
-                className="w-full px-4 py-3 border border-gray rounded-lg font-body text-dark placeholder:text-gray/50 focus:border-slate-blue focus:ring-2 focus:ring-slate-blue/20 outline-none transition-all mb-4"
+                className="input-brutal mb-4"
                 autoFocus
               />
               <div className="max-h-64 overflow-y-auto space-y-4">
                 {Object.entries(groupedCountries).map(([region, countries]) => (
                   <div key={region}>
-                    <h3 className="font-heading text-xs font-semibold text-gray uppercase tracking-wider mb-2">
+                    <h3 className="type-mono-look text-gray mb-2">
                       {regionNames[region as Region]}
                     </h3>
                     <div className="space-y-1">
@@ -245,14 +246,14 @@ export default function OnboardingPage() {
                         <button
                           key={country.code}
                           onClick={() => handleCountrySelect(country)}
-                          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
+                          className={`w-full flex items-center gap-3 px-3 py-2 border border-dark text-left transition-colors ${
                             formData.country === country.code
-                              ? 'bg-accent/10 border border-accent'
+                              ? 'bg-accent text-light'
                               : 'hover:bg-sand'
                           }`}
                         >
                           <span className="text-xl">{country.flag}</span>
-                          <span className="font-body text-dark">{country.name}</span>
+                          <span>{country.name}</span>
                         </button>
                       ))}
                     </div>
@@ -264,57 +265,57 @@ export default function OnboardingPage() {
 
           {step === 'visibility' && (
             <div>
-              <h1 className="font-heading text-2xl font-bold text-dark mb-2">
+              <h1 className="type-display-condensed text-2xl text-dark mb-2">
                 Profile visibility
               </h1>
-              <p className="font-body text-gray mb-6">
+              <p className="text-sm text-gray mb-6">
                 Choose who can see your activity.
               </p>
               <div className="space-y-3">
                 <button
                   onClick={() => setFormData((prev) => ({ ...prev, isPublic: true }))}
-                  className={`w-full flex items-start gap-4 p-4 rounded-lg border transition-colors text-left ${
+                  className={`w-full flex items-start gap-4 p-4 border transition-colors text-left ${
                     formData.isPublic
-                      ? 'border-accent bg-accent/5'
-                      : 'border-sand hover:border-gray'
+                      ? 'border-dark bg-accent/10'
+                      : 'border-dark hover:bg-sand'
                   }`}
                 >
                   <div
-                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                      formData.isPublic ? 'border-accent' : 'border-gray'
+                    className={`w-5 h-5 border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                      formData.isPublic ? 'border-dark' : 'border-dark'
                     }`}
                   >
                     {formData.isPublic && (
-                      <div className="w-3 h-3 rounded-full bg-accent" />
+                      <div className="w-3 h-3 bg-accent" />
                     )}
                   </div>
                   <div>
-                    <h3 className="font-heading font-semibold text-dark">Public</h3>
-                    <p className="font-body text-sm text-gray">
+                    <h3 className="type-display-condensed text-sm text-dark">Public</h3>
+                    <p className="text-sm text-gray">
                       Your profile and posts are visible to everyone. You appear on leaderboards.
                     </p>
                   </div>
                 </button>
                 <button
                   onClick={() => setFormData((prev) => ({ ...prev, isPublic: false }))}
-                  className={`w-full flex items-start gap-4 p-4 rounded-lg border transition-colors text-left ${
+                  className={`w-full flex items-start gap-4 p-4 border transition-colors text-left ${
                     !formData.isPublic
-                      ? 'border-accent bg-accent/5'
-                      : 'border-sand hover:border-gray'
+                      ? 'border-dark bg-accent/10'
+                      : 'border-dark hover:bg-sand'
                   }`}
                 >
                   <div
-                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                      !formData.isPublic ? 'border-accent' : 'border-gray'
+                    className={`w-5 h-5 border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                      !formData.isPublic ? 'border-dark' : 'border-dark'
                     }`}
                   >
                     {!formData.isPublic && (
-                      <div className="w-3 h-3 rounded-full bg-accent" />
+                      <div className="w-3 h-3 bg-accent" />
                     )}
                   </div>
                   <div>
-                    <h3 className="font-heading font-semibold text-dark">Private</h3>
-                    <p className="font-body text-sm text-gray">
+                    <h3 className="type-display-condensed text-sm text-dark">Private</h3>
+                    <p className="text-sm text-gray">
                       Only your followers can see your posts. You don&apos;t appear on leaderboards.
                     </p>
                   </div>
@@ -325,35 +326,35 @@ export default function OnboardingPage() {
 
           {step === 'optional' && (
             <div>
-              <h1 className="font-heading text-2xl font-bold text-dark mb-2">
+              <h1 className="type-display-condensed text-2xl text-dark mb-2">
                 Almost done!
               </h1>
-              <p className="font-body text-gray mb-6">
+              <p className="text-sm text-gray mb-6">
                 Add a bio and link (optional).
               </p>
               <div className="space-y-4">
                 <div>
-                  <label className="block font-body text-sm text-gray mb-1">Bio</label>
+                  <label className="type-mono-look text-gray mb-1">Bio</label>
                   <textarea
                     value={formData.bio}
                     onChange={(e) => setFormData((prev) => ({ ...prev, bio: e.target.value }))}
                     placeholder="Tell us about yourself..."
                     maxLength={160}
                     rows={3}
-                    className="w-full px-4 py-3 border border-gray rounded-lg font-body text-dark placeholder:text-gray/50 focus:border-slate-blue focus:ring-2 focus:ring-slate-blue/20 outline-none transition-all resize-none"
+                    className="input-brutal resize-none"
                   />
                   <p className="text-right text-xs text-gray mt-1">
                     {formData.bio.length}/160
                   </p>
                 </div>
                 <div>
-                  <label className="block font-body text-sm text-gray mb-1">Website</label>
+                  <label className="type-mono-look text-gray mb-1">Website</label>
                   <input
                     type="url"
                     value={formData.link}
                     onChange={(e) => setFormData((prev) => ({ ...prev, link: e.target.value }))}
                     placeholder="https://your-website.com"
-                    className="w-full px-4 py-3 border border-gray rounded-lg font-body text-dark placeholder:text-gray/50 focus:border-slate-blue focus:ring-2 focus:ring-slate-blue/20 outline-none transition-all"
+                    className="input-brutal"
                   />
                 </div>
               </div>
@@ -365,7 +366,7 @@ export default function OnboardingPage() {
             {step !== 'username' && (
               <button
                 onClick={prevStep}
-                className="flex-1 px-6 py-3 border border-gray rounded-lg font-heading font-semibold text-dark hover:bg-sand transition-colors"
+                className="flex-1 btn-brutal btn-brutal-secondary justify-center"
               >
                 Back
               </button>
@@ -373,7 +374,7 @@ export default function OnboardingPage() {
             <button
               onClick={nextStep}
               disabled={!canProceed() || isSubmitting}
-              className="flex-1 px-6 py-3 bg-accent rounded-lg font-heading font-semibold text-light hover:bg-coral-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 btn-brutal btn-brutal-primary justify-center disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? 'Saving...' : step === 'optional' ? 'Complete' : 'Continue'}
             </button>

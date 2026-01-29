@@ -108,6 +108,7 @@ describe('User Registration Flow', () => {
       from: vi.fn((table: string) => {
         if (table === 'users') {
           return {
+            upsert: vi.fn().mockReturnThis(),
             select: vi.fn().mockReturnThis(),
             eq: vi.fn().mockReturnThis(),
             neq: vi.fn().mockReturnThis(),
@@ -215,7 +216,7 @@ describe('Usage Submission Flow', () => {
           totalTokens: 60000,
           costUSD: 5.25,
         },
-        source: 'cli',
+        source: 'web',
       }),
     });
 

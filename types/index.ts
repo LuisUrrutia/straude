@@ -105,11 +105,12 @@ export interface UserProfileResponse {
   stats: {
     global_rank: number | null;
     regional_rank: number | null;
-    current_streak: number;
-    total_spent: number;
+    current_streak: number | null;
+    total_spent: number | null;
     followers_count: number;
     following_count: number;
   };
+  stats_visible: boolean;
   is_following?: boolean;
   is_own_profile?: boolean;
 }

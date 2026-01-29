@@ -2528,7 +2528,8 @@ async function apiRequest(endpoint, options = {}) {
   const { data, text } = await readResponseBody(response);
   const looksLikeHtml = contentType.includes("text/html") || text.trim().startsWith("<!DOCTYPE") || text.trim().startsWith("<html");
   if (!response.ok) {
-    const errorMessage = data && (data.error || data.message) || (looksLikeHtml ? "Server returned HTML instead of JSON. Check STRAUDE_API_URL and authentication." : `Request failed: ${response.status} ${response.statusText}`);
+    const errorData = data;
+    const errorMessage = errorData && (errorData.error || errorData.message) || (looksLikeHtml ? "Server returned HTML instead of JSON. Check STRAUDE_API_URL and authentication." : `Request failed: ${response.status} ${response.statusText}`);
     throw new Error(errorMessage);
   }
   if (data === undefined) {
@@ -2670,6 +2671,8 @@ async function push(options = {}) {
       const parsed = JSON.parse(stdout);
       if (Array.isArray(parsed.daily)) {
         usageData = parsed.daily;
+      } else if (parsed.type === "daily" && Array.isArray(parsed.data)) {
+        usageData = parsed.data;
       } else if (Array.isArray(parsed.data)) {
         usageData = parsed.data;
       } else if (Array.isArray(parsed)) {
@@ -2677,7 +2680,7 @@ async function push(options = {}) {
       } else {
         usageData = [];
       }
-    } catch (parseError) {
+    } catch {
       console.log(import_picocolors2.default.yellow("Failed to parse ccusage output."));
       console.log(import_picocolors2.default.dim(`Raw output: ${stdout.slice(0, 200)}`));
       return;
@@ -2692,11 +2695,18 @@ async function push(options = {}) {
       console.log(import_picocolors2.default.yellow("No usage data found for today."));
       return;
     }
+    const models = todayData.models ?? todayData.modelsUsed ?? [];
+    const totalCost = typeof todayData.costUSD === "number" ? todayData.costUSD : typeof todayData.totalCost === "number" ? todayData.totalCost : 0;
+    const totalTokens = todayData.totalTokens ?? 0;
+    const inputTokens = todayData.inputTokens ?? 0;
+    const outputTokens = todayData.outputTokens ?? 0;
+    const cacheCreationTokens = todayData.cacheCreationTokens ?? 0;
+    const cacheReadTokens = todayData.cacheReadTokens ?? 0;
     console.log();
     console.log(import_picocolors2.default.bold("Today's usage:"));
-    console.log(`  Cost: ${import_picocolors2.default.green(`$${todayData.totalCost.toFixed(2)}`)}`);
-    console.log(`  Tokens: ${import_picocolors2.default.cyan(formatNumber(todayData.totalTokens))}`);
-    console.log(`  Models: ${import_picocolors2.default.dim(todayData.modelsUsed.join(", "))}`);
+    console.log(`  Cost: ${import_picocolors2.default.green(`$${totalCost.toFixed(2)}`)}`);
+    console.log(`  Tokens: ${import_picocolors2.default.cyan(formatNumber(totalTokens))}`);
+    console.log(`  Models: ${import_picocolors2.default.dim(models.length > 0 ? models.join(", ") : "—")}`);
     console.log();
     if (options.dryRun) {
       console.log(import_picocolors2.default.yellow("Dry run - not submitting data."));
@@ -2707,13 +2717,13 @@ async function push(options = {}) {
       date: targetDate,
       data: {
         date: todayData.date,
-        models: todayData.modelsUsed,
-        inputTokens: todayData.inputTokens,
-        outputTokens: todayData.outputTokens,
-        cacheCreationTokens: todayData.cacheCreationTokens || 0,
-        cacheReadTokens: todayData.cacheReadTokens || 0,
-        totalTokens: todayData.totalTokens,
-        costUSD: todayData.totalCost
+        models,
+        inputTokens,
+        outputTokens,
+        cacheCreationTokens,
+        cacheReadTokens,
+        totalTokens,
+        costUSD: totalCost
       },
       source: "cli"
     });

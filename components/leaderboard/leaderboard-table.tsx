@@ -66,7 +66,7 @@ export function LeaderboardTable({ entries, currentUserId }: LeaderboardTablePro
                   {displayName.charAt(0).toUpperCase()}
                 </div>
               )}
-              <span className="font-semibold text-lg truncate">
+              <span className="font-heading text-lg truncate">
                 {displayName}
               </span>
             </div>

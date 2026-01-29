@@ -67,7 +67,7 @@ describe('POST /api/usage/submit', () => {
           totalTokens: 60000,
           costUSD: 5.25,
         },
-        source: 'cli',
+        source: 'web',
       }),
     });
 
@@ -105,7 +105,7 @@ describe('POST /api/usage/submit', () => {
           totalTokens: 60000,
           costUSD: 5.25,
         },
-        source: 'cli',
+        source: 'web',
       }),
     });
 
@@ -173,7 +173,7 @@ describe('POST /api/usage/submit', () => {
           totalTokens: 60000,
           costUSD: 5.25,
         },
-        source: 'cli',
+        source: 'web',
       }),
     });
 

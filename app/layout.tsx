@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Archivo, Inter, JetBrains_Mono } from "next/font/google";
+import { Archivo, IBM_Plex_Sans, JetBrains_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Agentation } from "agentation";
 import "./globals.css";
@@ -10,10 +10,10 @@ const archivo = Archivo({
   weight: ["400", "500", "600", "700"],
 });
 
-const inter = Inter({
+const plexSans = IBM_Plex_Sans({
   variable: "--font-body",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["400", "500", "600", "700"],
 });
 
 const jetbrainsMono = JetBrains_Mono({
@@ -58,7 +58,7 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en">
-        <body className={`${archivo.variable} ${inter.variable} ${jetbrainsMono.variable} antialiased`}>
+        <body className={`${archivo.variable} ${plexSans.variable} ${jetbrainsMono.variable} antialiased`}>
           {children}
           {process.env.NODE_ENV === "development" && <Agentation />}
         </body>

@@ -6,28 +6,28 @@ export default function SignInPage() {
       appearance={{
         elements: {
           rootBox: 'w-full',
-          card: 'bg-light border border-sand shadow-lg',
-          headerTitle: 'font-heading text-dark',
-          headerSubtitle: 'font-body text-gray',
+          card: 'bg-light border-2 border-dark shadow-none',
+          headerTitle: 'type-display text-dark text-2xl',
+          headerSubtitle: 'type-mono-look text-gray',
           formButtonPrimary:
-            'bg-accent hover:bg-coral-dark text-light font-heading',
+            'btn-brutal btn-brutal-primary w-full justify-center',
           formFieldInput:
-            'border-gray focus:border-slate-blue focus:ring-slate-blue/20',
-          footerActionLink: 'text-accent hover:text-coral-dark',
+            'input-brutal',
+          footerActionLink: 'type-mono-look text-accent hover:text-dark',
           identityPreviewText: 'text-dark',
           identityPreviewEditButton: 'text-accent',
           socialButtonsBlockButton:
-            'border-gray hover:bg-sand text-dark font-body',
-          dividerLine: 'bg-sand',
-          dividerText: 'text-gray font-body',
+            'btn-brutal btn-brutal-secondary w-full justify-center',
+          dividerLine: 'bg-dark/20',
+          dividerText: 'type-mono-look text-gray',
         },
         variables: {
-          colorPrimary: '#c6603f',
-          colorBackground: '#faf9f5',
-          colorText: '#141413',
-          colorTextSecondary: '#b0aea5',
+          colorPrimary: '#FF4D00',
+          colorBackground: '#FFFFFF',
+          colorText: '#000000',
+          colorTextSecondary: '#666666',
           fontFamily: 'var(--font-body)',
-          borderRadius: '6px',
+          borderRadius: '0px',
         },
       }}
       forceRedirectUrl="/onboarding"

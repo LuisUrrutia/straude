@@ -13,11 +13,11 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         disabled={disabled}
         className={clsx(
-          'inline-flex items-center justify-center font-heading font-semibold transition-colors rounded-lg',
+          'inline-flex items-center justify-center font-heading font-semibold transition-colors',
           {
-            'bg-accent text-light hover:bg-coral-dark': variant === 'primary',
-            'bg-transparent text-dark border border-gray hover:bg-sand': variant === 'secondary',
-            'bg-transparent text-accent hover:bg-accent/10': variant === 'ghost',
+            'btn-brutal btn-brutal-primary': variant === 'primary',
+            'btn-brutal btn-brutal-secondary': variant === 'secondary',
+            'btn-brutal btn-brutal-ghost': variant === 'ghost',
             'px-3 py-1.5 text-sm': size === 'sm',
             'px-6 py-3 text-sm': size === 'md',
             'px-8 py-4 text-base': size === 'lg',

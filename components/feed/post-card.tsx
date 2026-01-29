@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { formatDistanceToNow } from '@/lib/utils/date';
@@ -23,6 +24,12 @@ function getAvatarStyle(index: number): string {
 }
 
 export function PostCard({ post, onLike }: PostCardProps) {
+  const [timeLabel, setTimeLabel] = useState('...');
+
+  useEffect(() => {
+    setTimeLabel(formatDistanceToNow(post.created_at));
+  }, [post.created_at]);
+
   const handleShare = () => {
     const url = `${window.location.origin}/posts/${post.id}`;
     navigator.clipboard.writeText(url);
@@ -63,7 +70,7 @@ export function PostCard({ post, onLike }: PostCardProps) {
             {displayName}
           </Link>
           <span className="type-mono-look text-gray">
-            {formatDistanceToNow(post.created_at)}
+            {timeLabel}
           </span>
         </div>
 
@@ -115,7 +122,7 @@ export function PostCard({ post, onLike }: PostCardProps) {
         )}
 
         {/* Actions */}
-        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-sand">
+        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-dark">
           <LikeButton
             postId={post.id}
             initialLiked={post.is_liked || false}

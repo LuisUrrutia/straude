@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 import { createClient } from '@/lib/supabase/server';
 
 export async function GET(
@@ -11,13 +12,43 @@ export async function GET(
   // Get user
   const { data: userData, error } = await supabase
     .from('users')
-    .select('id')
+    .select('id, is_public, clerk_id')
     .eq('username', username)
     .single();
 
-  const user = userData as { id: string } | null;
+  const user = userData as { id: string; is_public: boolean; clerk_id: string | null } | null;
   if (error || !user) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 });
+  }
+
+  const { userId } = await auth();
+  let canView = user.is_public;
+
+  if (userId) {
+    if (user.clerk_id === userId) {
+      canView = true;
+    } else if (!user.is_public) {
+      const { data: currentUserData } = await supabase
+        .from('users')
+        .select('id')
+        .eq('clerk_id', userId)
+        .single();
+
+      const currentUser = currentUserData as { id: string } | null;
+      if (currentUser) {
+        const { data: follow } = await supabase
+          .from('follows')
+          .select('id')
+          .eq('follower_id', currentUser.id)
+          .eq('following_id', user.id)
+          .maybeSingle();
+        canView = !!follow;
+      }
+    }
+  }
+
+  if (!canView) {
+    return NextResponse.json({ error: 'Private profile' }, { status: 403 });
   }
 
   // Get last 52 weeks of data

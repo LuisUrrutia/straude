@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { createClient } from '@/lib/supabase/server';
+import { getBearerToken, verifyCliToken } from '@/lib/auth/cli';
 
 interface UserRow {
   id: string;
@@ -12,20 +13,28 @@ interface UserWithUsage {
   daily_usage: Array<{ cost_usd: number }>;
 }
 
-export async function GET() {
-  const { userId } = await auth();
+export async function GET(request: NextRequest) {
+  const { userId: clerkId } = await auth();
+  const bearerToken = getBearerToken(request);
 
-  if (!userId) {
+  if (!clerkId && bearerToken && !process.env.CLI_JWT_SECRET) {
+    return NextResponse.json({ error: 'CLI auth not configured' }, { status: 500 });
+  }
+
+  const cliAuth = !clerkId && bearerToken ? await verifyCliToken(bearerToken) : null;
+
+  if (!clerkId && !cliAuth) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const supabase = await createClient();
 
   // Get user
+  const authType = clerkId ? 'clerk' : 'cli';
   const { data: userData, error } = await supabase
     .from('users')
     .select('id, is_public')
-    .eq('clerk_id', userId)
+    .eq(authType === 'clerk' ? 'clerk_id' : 'id', authType === 'clerk' ? clerkId! : cliAuth!.userId)
     .single();
 
   const user = userData as UserRow | null;

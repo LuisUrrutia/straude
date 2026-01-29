@@ -70,44 +70,45 @@ export async function GET(
     }
   }
 
-  // Get stats
-  const [
-    { count: followersCount },
-    { count: followingCount },
-    { data: allTimeUsageData },
-  ] = await Promise.all([
+  const canViewStats = user.is_public || isOwnProfile || isFollowing;
+
+  // Always fetch follower counts
+  const [{ count: followersCount }, { count: followingCount }] = await Promise.all([
     supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', user.id),
     supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', user.id),
-    supabase.from('daily_usage').select('cost_usd').eq('user_id', user.id),
   ]);
 
-  const allTimeUsage = allTimeUsageData as Array<{ cost_usd: number }> | null;
-  const totalSpent = allTimeUsage?.reduce((sum, u) => sum + Number(u.cost_usd), 0) || 0;
+  let totalSpent: number | null = null;
+  let streak: number | null = null;
 
-  // Calculate streak manually
-  const { data: usageDates } = await supabase
-    .from('daily_usage')
-    .select('date')
-    .eq('user_id', user.id)
-    .order('date', { ascending: false });
+  if (canViewStats) {
+    const [{ data: allTimeUsageData }, { data: usageDates }] = await Promise.all([
+      supabase.from('daily_usage').select('cost_usd').eq('user_id', user.id),
+      supabase.from('daily_usage').select('date').eq('user_id', user.id).order('date', { ascending: false }),
+    ]);
 
-  const dates = (usageDates as Array<{ date: string }> | null)?.map(d => d.date) || [];
-  let streak = 0;
-  const today = new Date().toISOString().split('T')[0];
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    const allTimeUsage = allTimeUsageData as Array<{ cost_usd: number }> | null;
+    totalSpent = allTimeUsage?.reduce((sum, u) => sum + Number(u.cost_usd), 0) || 0;
 
-  if (dates.length > 0 && (dates[0] === today || dates[0] === yesterday)) {
-    streak = 1;
-    for (let i = 1; i < dates.length; i++) {
-      const prev = new Date(dates[i - 1]);
-      const curr = new Date(dates[i]);
-      const diffDays = (prev.getTime() - curr.getTime()) / 86400000;
-      if (diffDays === 1) {
-        streak++;
-      } else {
-        break;
+    const dates = (usageDates as Array<{ date: string }> | null)?.map(d => d.date) || [];
+    let streakCount = 0;
+    const today = new Date().toISOString().split('T')[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+    if (dates.length > 0 && (dates[0] === today || dates[0] === yesterday)) {
+      streakCount = 1;
+      for (let i = 1; i < dates.length; i++) {
+        const prev = new Date(dates[i - 1]);
+        const curr = new Date(dates[i]);
+        const diffDays = (prev.getTime() - curr.getTime()) / 86400000;
+        if (diffDays === 1) {
+          streakCount++;
+        } else {
+          break;
+        }
       }
     }
+    streak = streakCount;
   }
 
   // Get ranks (simplified - just based on all-time cost for now)
@@ -181,6 +182,7 @@ export async function GET(
       followers_count: followersCount || 0,
       following_count: followingCount || 0,
     },
+    stats_visible: canViewStats,
     is_following: isFollowing,
     is_own_profile: isOwnProfile,
   };

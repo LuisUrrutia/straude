@@ -123,12 +123,12 @@ export function CommentSection({ postId, currentUserId }: CommentSectionProps) {
           onChange={(e) => setNewComment(e.target.value)}
           placeholder="Write a comment..."
           maxLength={500}
-          className="flex-1 px-4 py-2 border border-gray rounded-lg font-body text-dark placeholder:text-gray/50 focus:border-slate-blue focus:ring-2 focus:ring-slate-blue/20 outline-none transition-all"
+          className="input-brutal flex-1"
         />
         <button
           type="submit"
           disabled={!newComment.trim() || isSubmitting}
-          className="px-4 py-2 bg-accent text-light rounded-lg hover:bg-coral-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="btn-brutal btn-brutal-primary disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isSubmitting ? (
             <Loader2 className="size-5 animate-spin" />
@@ -144,7 +144,7 @@ export function CommentSection({ postId, currentUserId }: CommentSectionProps) {
           <Loader2 className="size-6 text-accent animate-spin" />
         </div>
       ) : comments.length === 0 ? (
-        <p className="text-center text-gray py-6 font-body">
+        <p className="text-center text-gray py-6 type-mono-look">
           No comments yet. Be the first!
         </p>
       ) : (
@@ -162,7 +162,7 @@ export function CommentSection({ postId, currentUserId }: CommentSectionProps) {
                 <div className="flex items-center gap-2">
                   <Link
                     href={`/u/${comment.user.username}`}
-                    className="font-heading font-semibold text-sm text-dark hover:text-accent"
+                    className="font-heading text-sm text-dark hover:text-accent"
                   >
                     {comment.user.display_name || comment.user.username}
                   </Link>

@@ -59,7 +59,7 @@ function SearchContent() {
 
   return (
     <div className="max-w-xl mx-auto">
-      <h1 className="font-heading text-2xl font-bold text-dark mb-6">Search</h1>
+      <h1 className="type-display-condensed text-2xl text-dark mb-6">Search</h1>
 
       {/* Search input */}
       <div className="relative mb-6">
@@ -70,7 +70,8 @@ function SearchContent() {
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search users..."
           autoFocus
-          className="w-full pl-12 pr-4 py-3 border border-gray rounded-lg font-body text-dark placeholder:text-gray/50 focus:border-slate-blue focus:ring-2 focus:ring-slate-blue/20 outline-none transition-all"
+          className="input-brutal"
+          style={{ paddingLeft: '3rem', paddingRight: '1rem' }}
         />
       </div>
 
@@ -85,7 +86,7 @@ function SearchContent() {
             <Link
               key={user.id}
               href={`/u/${user.username}`}
-              className="flex items-center gap-4 p-4 rounded-lg hover:bg-sand transition-colors"
+              className="flex items-center gap-4 p-4 border border-dark hover:bg-sand transition-colors"
             >
               <Avatar
                 src={user.avatar_url}
@@ -93,26 +94,26 @@ function SearchContent() {
                 size="md"
               />
               <div className="flex-1 min-w-0">
-                <div className="font-heading font-semibold text-dark">
+                <div className="font-heading text-sm text-dark">
                   {user.display_name || user.username}
                 </div>
-                <div className="text-sm text-gray">@{user.username}</div>
+                <div className="type-mono-look text-gray">@{user.username}</div>
                 {user.bio && (
                   <div className="text-sm text-gray truncate mt-1">{user.bio}</div>
                 )}
               </div>
-              <div className="text-sm text-gray">
+              <div className="type-mono-look text-gray">
                 {formatCompactNumber(user.followers_count)} followers
               </div>
             </Link>
           ))}
         </div>
       ) : query ? (
-        <div className="text-center py-8 text-gray font-body">
+        <div className="text-center py-8 text-gray type-mono-look">
           No users found for &ldquo;{query}&rdquo;
         </div>
       ) : (
-        <div className="text-center py-8 text-gray font-body">
+        <div className="text-center py-8 text-gray type-mono-look">
           Start typing to search for users
         </div>
       )}
@@ -125,7 +126,7 @@ export default function SearchPage() {
     <Suspense
       fallback={
         <div className="max-w-xl mx-auto">
-          <h1 className="font-heading text-2xl font-bold text-dark mb-6">Search</h1>
+          <h1 className="type-display-condensed text-2xl text-dark mb-6">Search</h1>
           <div className="flex justify-center py-8">
             <Loader2 className="size-6 text-accent animate-spin" />
           </div>

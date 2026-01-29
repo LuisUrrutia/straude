@@ -11,6 +11,7 @@ interface ContributionData {
 
 interface ContributionGraphProps {
   data: ContributionData[];
+  referenceDate?: string;
 }
 
 function getColor(cost: number): string {
@@ -21,7 +22,7 @@ function getColor(cost: number): string {
   return 'bg-coral-dark';
 }
 
-export function ContributionGraph({ data }: ContributionGraphProps) {
+export function ContributionGraph({ data, referenceDate }: ContributionGraphProps) {
   const [hoveredCell, setHoveredCell] = useState<ContributionData | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
@@ -30,7 +31,7 @@ export function ContributionGraph({ data }: ContributionGraphProps) {
     const costMap = new Map(data.map((d) => [d.date, d.cost_usd]));
 
     // Generate 52 weeks of data
-    const today = new Date();
+    const today = referenceDate ? new Date(referenceDate) : new Date();
     const grid: Array<Array<{ date: string; cost: number }>> = [];
     const months: Array<{ name: string; week: number }> = [];
 
@@ -67,7 +68,7 @@ export function ContributionGraph({ data }: ContributionGraphProps) {
     }
 
     return { grid, months };
-  }, [data]);
+  }, [data, referenceDate]);
 
   const handleMouseEnter = (
     e: React.MouseEvent<HTMLDivElement>,
@@ -114,7 +115,7 @@ export function ContributionGraph({ data }: ContributionGraphProps) {
               <div
                 key={dayIdx}
                 className={clsx(
-                  'size-3 rounded-sm transition-transform hover:scale-125 cursor-pointer',
+                  'size-3 rounded-none transition-transform hover:scale-125 cursor-pointer',
                   cell.cost < 0 ? 'bg-transparent' : getColor(cell.cost)
                 )}
                 onMouseEnter={(e) => handleMouseEnter(e, cell)}
@@ -128,18 +129,18 @@ export function ContributionGraph({ data }: ContributionGraphProps) {
       {/* Legend */}
       <div className="flex items-center justify-end gap-1 mt-2 text-xs text-gray">
         <span>Less</span>
-        <div className="size-3 rounded-sm bg-sand" />
-        <div className="size-3 rounded-sm bg-coral-light" />
-        <div className="size-3 rounded-sm bg-coral-medium" />
-        <div className="size-3 rounded-sm bg-coral" />
-        <div className="size-3 rounded-sm bg-coral-dark" />
+        <div className="size-3 rounded-none bg-sand" />
+        <div className="size-3 rounded-none bg-coral-light" />
+        <div className="size-3 rounded-none bg-coral-medium" />
+        <div className="size-3 rounded-none bg-coral" />
+        <div className="size-3 rounded-none bg-coral-dark" />
         <span>More</span>
       </div>
 
       {/* Tooltip */}
       {hoveredCell && (
         <div
-          className="fixed z-50 bg-dark text-light px-3 py-2 rounded-md text-sm shadow-lg pointer-events-none"
+          className="fixed z-50 bg-dark text-light px-3 py-2 text-sm shadow-lg pointer-events-none border border-dark"
           style={{
             left: tooltipPos.x + 10,
             top: tooltipPos.y - 40,

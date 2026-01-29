@@ -65,47 +65,47 @@ function VerifyContent() {
     return (
       <div className="flex items-center gap-2 text-gray">
         <Loader2 className="size-5 animate-spin" />
-        Loading...
+        <span className="type-mono-look">Loading...</span>
       </div>
     );
   }
 
   return (
     <div className="w-full max-w-md mx-auto">
-      <div className="bg-light border border-sand rounded-xl p-8 shadow-lg text-center">
+      <div className="panel-brutal p-8 text-center">
         {status === 'loading' && (
           <div className="flex flex-col items-center gap-4">
             <Loader2 className="size-12 text-accent animate-spin" />
-            <p className="text-gray">Processing...</p>
+            <p className="type-mono-look text-gray">Processing...</p>
           </div>
         )}
 
         {status === 'confirming' && (
           <div className="flex flex-col items-center gap-6">
-            <div className="size-16 rounded-full bg-accent/10 flex items-center justify-center">
-              <span className="font-heading text-2xl font-bold text-accent">CLI</span>
+            <div className="size-16 border border-dark bg-sand flex items-center justify-center">
+              <span className="type-display-condensed text-xl text-accent">CLI</span>
             </div>
             <div>
-              <h1 className="font-heading text-2xl font-bold text-dark mb-2">
+              <h1 className="type-display-condensed text-2xl text-dark mb-2">
                 Confirm CLI Access
               </h1>
-              <p className="text-gray">
+              <p className="text-sm text-gray">
                 The Straude CLI is requesting access to your account.
               </p>
             </div>
-            <div className="bg-sand/50 rounded-lg px-4 py-3 font-mono text-lg tracking-wider">
+            <div className="border border-dark px-4 py-3 font-mono text-lg tracking-wider">
               {code}
             </div>
             <div className="flex gap-3 w-full">
               <button
                 onClick={() => router.push('/feed')}
-                className="flex-1 px-6 py-3 border border-gray rounded-lg font-heading font-semibold text-dark hover:bg-sand transition-colors"
+                className="flex-1 btn-brutal btn-brutal-secondary justify-center"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirm}
-                className="flex-1 px-6 py-3 bg-accent rounded-lg font-heading font-semibold text-light hover:bg-coral-dark transition-colors"
+                className="flex-1 btn-brutal btn-brutal-primary justify-center"
               >
                 Authorize
               </button>
@@ -115,12 +115,12 @@ function VerifyContent() {
 
         {status === 'success' && (
           <div className="flex flex-col items-center gap-4">
-            <CheckCircle className="size-16 text-sage" />
+            <CheckCircle className="size-16 text-success" />
             <div>
-              <h1 className="font-heading text-2xl font-bold text-dark mb-2">
+              <h1 className="type-display-condensed text-2xl text-dark mb-2">
                 CLI Authorized!
               </h1>
-              <p className="text-gray">
+              <p className="text-sm text-gray">
                 You can close this window and return to your terminal.
               </p>
             </div>
@@ -131,14 +131,14 @@ function VerifyContent() {
           <div className="flex flex-col items-center gap-4">
             <XCircle className="size-16 text-error" />
             <div>
-              <h1 className="font-heading text-2xl font-bold text-dark mb-2">
+              <h1 className="type-display-condensed text-2xl text-dark mb-2">
                 Verification Failed
               </h1>
-              <p className="text-gray">{displayError}</p>
+              <p className="text-sm text-gray">{displayError}</p>
             </div>
             <button
               onClick={() => router.push('/feed')}
-              className="px-6 py-3 bg-accent rounded-lg font-heading font-semibold text-light hover:bg-coral-dark transition-colors"
+              className="btn-brutal btn-brutal-primary justify-center"
             >
               Go to Feed
             </button>
@@ -156,7 +156,7 @@ export default function VerifyPage() {
         fallback={
           <div className="flex items-center gap-2 text-gray">
             <Loader2 className="size-5 animate-spin" />
-            Loading...
+            <span className="type-mono-look">Loading...</span>
           </div>
         }
       >

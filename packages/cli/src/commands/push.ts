@@ -8,13 +8,15 @@ const execAsync = promisify(exec);
 
 interface UsageData {
   date: string;
-  modelsUsed: string[];
-  inputTokens: number;
-  outputTokens: number;
-  cacheCreationTokens: number;
-  cacheReadTokens: number;
-  totalTokens: number;
-  totalCost: number;
+  models?: string[];
+  modelsUsed?: string[];
+  inputTokens?: number;
+  outputTokens?: number;
+  cacheCreationTokens?: number;
+  cacheReadTokens?: number;
+  totalTokens?: number;
+  costUSD?: number;
+  totalCost?: number;
 }
 
 interface PushOptions {
@@ -71,6 +73,8 @@ export async function push(options: PushOptions = {}): Promise<void> {
       // ccusage returns { daily: [...], totals: {...} } format
       if (Array.isArray(parsed.daily)) {
         usageData = parsed.daily;
+      } else if (parsed.type === 'daily' && Array.isArray(parsed.data)) {
+        usageData = parsed.data;
       } else if (Array.isArray(parsed.data)) {
         // Fallback for older format
         usageData = parsed.data;
@@ -98,11 +102,23 @@ export async function push(options: PushOptions = {}): Promise<void> {
       return;
     }
 
+    const models = todayData.models ?? todayData.modelsUsed ?? [];
+    const totalCost = typeof todayData.costUSD === 'number'
+      ? todayData.costUSD
+      : typeof todayData.totalCost === 'number'
+        ? todayData.totalCost
+        : 0;
+    const totalTokens = todayData.totalTokens ?? 0;
+    const inputTokens = todayData.inputTokens ?? 0;
+    const outputTokens = todayData.outputTokens ?? 0;
+    const cacheCreationTokens = todayData.cacheCreationTokens ?? 0;
+    const cacheReadTokens = todayData.cacheReadTokens ?? 0;
+
     console.log();
     console.log(pc.bold('Today\'s usage:'));
-    console.log(`  Cost: ${pc.green(`$${todayData.totalCost.toFixed(2)}`)}`);
-    console.log(`  Tokens: ${pc.cyan(formatNumber(todayData.totalTokens))}`);
-    console.log(`  Models: ${pc.dim(todayData.modelsUsed.join(', '))}`);
+    console.log(`  Cost: ${pc.green(`$${totalCost.toFixed(2)}`)}`);
+    console.log(`  Tokens: ${pc.cyan(formatNumber(totalTokens))}`);
+    console.log(`  Models: ${pc.dim(models.length > 0 ? models.join(', ') : '—')}`);
     console.log();
 
     if (options.dryRun) {
@@ -116,13 +132,13 @@ export async function push(options: PushOptions = {}): Promise<void> {
       date: targetDate,
       data: {
         date: todayData.date,
-        models: todayData.modelsUsed,
-        inputTokens: todayData.inputTokens,
-        outputTokens: todayData.outputTokens,
-        cacheCreationTokens: todayData.cacheCreationTokens || 0,
-        cacheReadTokens: todayData.cacheReadTokens || 0,
-        totalTokens: todayData.totalTokens,
-        costUSD: todayData.totalCost,
+        models,
+        inputTokens,
+        outputTokens,
+        cacheCreationTokens,
+        cacheReadTokens,
+        totalTokens,
+        costUSD: totalCost,
       },
       source: 'cli',
     });

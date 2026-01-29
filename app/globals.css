@@ -17,6 +17,14 @@
   --color-accent-pink: #D8006E;
   --color-accent-orange: #F3552E;
 
+  /* Legacy alias scale (maps to accent family) */
+  --color-coral: #FF4D00;
+  --color-coral-light: #FF9A6A;
+  --color-coral-medium: #FF7A3D;
+  --color-coral-dark: #D63A00;
+  --color-slate-blue: #5A35B6;
+  --color-sage: #4a9c4a;
+
   /* Semantic Colors */
   --color-error: #c94a4a;
   --color-success: #4a9c4a;
@@ -49,6 +57,12 @@
   --color-accent-purple: var(--color-accent-purple);
   --color-accent-pink: var(--color-accent-pink);
   --color-accent-orange: var(--color-accent-orange);
+  --color-coral: var(--color-coral);
+  --color-coral-light: var(--color-coral-light);
+  --color-coral-medium: var(--color-coral-medium);
+  --color-coral-dark: var(--color-coral-dark);
+  --color-slate-blue: var(--color-slate-blue);
+  --color-sage: var(--color-sage);
   --color-error: var(--color-error);
   --color-success: var(--color-success);
   --font-display: var(--font-display);
@@ -174,7 +188,26 @@ body {
 
 .btn-brutal-primary:hover {
   background-color: var(--color-accent);
-  color: var(--color-light);
+  color: var(--color-dark);
+}
+
+.btn-brutal-secondary {
+  border: var(--border-width) solid var(--color-dark);
+  color: var(--color-dark);
+  background: transparent;
+}
+
+.btn-brutal-secondary:hover {
+  background-color: var(--color-sand);
+}
+
+.btn-brutal-ghost {
+  color: var(--color-accent);
+  background: transparent;
+}
+
+.btn-brutal-ghost:hover {
+  background-color: rgba(255, 77, 0, 0.1);
 }
 
 /* ============================================
@@ -191,6 +224,11 @@ body {
 .card-brutal:hover {
   transform: translate(-2px, -2px);
   box-shadow: 6px 6px 0px var(--color-accent);
+}
+
+.panel-brutal {
+  background: var(--color-light);
+  border: var(--border-width) solid var(--color-dark);
 }
 
 /* ============================================
@@ -241,11 +279,15 @@ body {
 .input-brutal:focus {
   outline: none;
   border-color: var(--color-slate-blue);
-  box-shadow: 0 0 0 3px rgba(106, 155, 204, 0.2);
+  box-shadow: 0 0 0 3px rgba(90, 53, 182, 0.2);
 }
 
 .input-brutal::placeholder {
   color: var(--color-gray);
+}
+
+.input-brutal-mono {
+  font-family: var(--font-mono), monospace;
 }
 
 /* ============================================
@@ -444,7 +486,7 @@ body {
 .tab-strip {
   display: flex;
   border-bottom: var(--border-width) solid var(--color-dark);
-  background: var(--color-light);
+  background: var(--color-beige);
   position: sticky;
   top: 0;
   z-index: 10;
@@ -633,6 +675,11 @@ body {
 
 .font-display {
   font-family: var(--font-display), sans-serif;
+}
+
+.font-heading {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 600;
 }
 
 .font-body {
