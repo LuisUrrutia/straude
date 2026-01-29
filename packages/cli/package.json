@@ -1,0 +1,39 @@
+{
+  "name": "straude",
+  "version": "0.1.0",
+  "description": "CLI tool for Straude - Track and share your Claude Code usage",
+  "type": "module",
+  "bin": {
+    "straude": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "bun build src/index.ts --outdir ./dist --target node",
+    "dev": "bun run src/index.ts",
+    "prepublishOnly": "bun run build"
+  },
+  "dependencies": {
+    "ccusage": "^18.0.5",
+    "commander": "^12.1.0",
+    "open": "^10.1.0",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "typescript": "^5"
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "claude",
+    "claude-code",
+    "straude",
+    "usage",
+    "tracking"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ohong/straude"
+  },
+  "license": "MIT"
+}

@@ -70,7 +70,7 @@ function ShareCard() {
       {/* Content */}
       <div className="relative mt-2 grow rounded-lg bg-black/20 p-3">
          <p className="font-body text-xs italic text-light/90 leading-relaxed">
-           "Claude just oneshotted our whole billing system. Sunday well spent ☕"
+           &ldquo;Claude just oneshotted our whole billing system. Sunday well spent.&rdquo;
          </p>
       </div>
 

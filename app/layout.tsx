@@ -1,16 +1,23 @@
 import type { Metadata } from "next";
-import { Poppins, Lora } from "next/font/google";
+import { Archivo, Inter, JetBrains_Mono } from "next/font/google";
+import { ClerkProvider } from "@clerk/nextjs";
 import { Agentation } from "agentation";
 import "./globals.css";
 
-const poppins = Poppins({
-  variable: "--font-heading",
+const archivo = Archivo({
+  variable: "--font-display",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
 });
 
-const lora = Lora({
+const inter = Inter({
   variable: "--font-body",
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-mono",
   subsets: ["latin"],
   weight: ["400", "500"],
 });
@@ -49,11 +56,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${poppins.variable} ${lora.variable} antialiased`}>
-        {children}
-        {process.env.NODE_ENV === "development" && <Agentation />}
-      </body>
-    </html>
+    <ClerkProvider>
+      <html lang="en">
+        <body className={`${archivo.variable} ${inter.variable} ${jetbrainsMono.variable} antialiased`}>
+          {children}
+          {process.env.NODE_ENV === "development" && <Agentation />}
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

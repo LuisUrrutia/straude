@@ -1,23 +1,657 @@
 @import "tailwindcss";
 
 :root {
-  --color-dark: #141413;
-  --color-light: #faf9f5;
-  --color-gray: #b0aea5;
-  --color-accent: #d97757;
+  /* Primary Palette - Brutalist colors from refs */
+  --color-dark: #000000;
+  --color-light: #FFFFFF;
+  --color-gray: #666666;
+  --color-sand: #f5f5f5;
+
+  /* Mobile palette (ref1) */
+  --color-beige: #E6E1D8;
+  --color-ink: #1C120F;
+
+  /* Accent Palette (refs 2 & 3) */
+  --color-accent: #FF4D00;
+  --color-accent-purple: #5A35B6;
+  --color-accent-pink: #D8006E;
+  --color-accent-orange: #F3552E;
+
+  /* Semantic Colors */
+  --color-error: #c94a4a;
+  --color-success: #4a9c4a;
+
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 48px;
+
+  /* Borders */
+  --border-width: 1px;
+  --border-width-bold: 2px;
+
+  /* Transitions */
+  --duration-fast: 150ms;
+  --duration-normal: 200ms;
+  --ease-out: cubic-bezier(0.33, 1, 0.68, 1);
 }
 
 @theme inline {
   --color-dark: var(--color-dark);
   --color-light: var(--color-light);
   --color-gray: var(--color-gray);
+  --color-sand: var(--color-sand);
+  --color-beige: var(--color-beige);
+  --color-ink: var(--color-ink);
   --color-accent: var(--color-accent);
-  --font-heading: var(--font-heading);
+  --color-accent-purple: var(--color-accent-purple);
+  --color-accent-pink: var(--color-accent-pink);
+  --color-accent-orange: var(--color-accent-orange);
+  --color-error: var(--color-error);
+  --color-success: var(--color-success);
+  --font-display: var(--font-display);
   --font-body: var(--font-body);
+  --font-mono: var(--font-mono);
 }
 
 body {
   background: var(--color-light);
   color: var(--color-dark);
-  font-family: var(--font-body), Georgia, serif;
+  font-family: var(--font-body), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ============================================
+   TYPOGRAPHY UTILITIES
+   ============================================ */
+
+/* Display text - bold, uppercase */
+.type-display {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  line-height: 0.9;
+}
+
+/* Display condensed - semibold */
+.type-display-condensed {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+/* Mono-look text - small, tracked, uppercase */
+.type-mono-look {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 500;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+
+/* ============================================
+   COMPONENT STYLES
+   ============================================ */
+
+/* Slash separator for numbers */
+.slash-sep {
+  display: inline-block;
+  margin: 0 2px;
+  font-weight: 300;
+  opacity: 0.5;
+  transform: skew(-15deg);
+}
+
+/* Rank numbers */
+.rank {
+  font-family: var(--font-display), sans-serif;
+  font-variation-settings: "wdth" 125, "wght" 700;
+}
+
+/* Metric values */
+.metric {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================
+   NAVIGATION STYLES
+   ============================================ */
+
+.nav-item {
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: var(--border-width) solid var(--color-dark);
+  font-family: var(--font-display), sans-serif;
+  font-weight: 500;
+  text-transform: uppercase;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: all var(--duration-fast) ease;
+  display: flex;
+  justify-content: space-between;
+}
+
+.nav-item:hover {
+  background-color: var(--color-dark);
+  color: var(--color-light);
+  padding-left: 32px;
+}
+
+.nav-item.active {
+  background-color: var(--color-accent);
+  color: var(--color-light);
+}
+
+/* ============================================
+   BUTTON STYLES
+   ============================================ */
+
+.btn-brutal {
+  padding: var(--space-md) var(--space-lg);
+  background: none;
+  border: none;
+  font-family: var(--font-display), sans-serif;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  transition: background var(--duration-fast) ease;
+}
+
+.btn-brutal:hover {
+  background-color: var(--color-sand);
+}
+
+.btn-brutal-primary {
+  background-color: var(--color-dark);
+  color: var(--color-light);
+}
+
+.btn-brutal-primary:hover {
+  background-color: var(--color-accent);
+  color: var(--color-light);
+}
+
+/* ============================================
+   CARD STYLES
+   ============================================ */
+
+.card-brutal {
+  background: var(--color-light);
+  border: var(--border-width) solid var(--color-dark);
+  box-shadow: 4px 4px 0px var(--color-dark);
+  transition: transform var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
+}
+
+.card-brutal:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0px var(--color-accent);
+}
+
+/* ============================================
+   FEED ROW STYLES
+   ============================================ */
+
+.feed-row {
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: var(--border-width) solid var(--color-dark);
+  display: grid;
+  gap: var(--space-md);
+  align-items: center;
+  transition: background var(--duration-fast) ease;
+}
+
+.feed-row:hover {
+  background-color: var(--color-sand);
+}
+
+/* ============================================
+   FOCUS & SELECTION
+   ============================================ */
+
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(106, 155, 204, 0.4);
+}
+
+::selection {
+  background: var(--color-accent);
+  color: var(--color-light);
+}
+
+/* ============================================
+   INPUT STYLES
+   ============================================ */
+
+.input-brutal {
+  width: 100%;
+  padding: var(--space-md);
+  border: var(--border-width) solid var(--color-dark);
+  background: var(--color-light);
+  font-family: var(--font-body), sans-serif;
+  font-size: 1rem;
+  transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
+}
+
+.input-brutal:focus {
+  outline: none;
+  border-color: var(--color-slate-blue);
+  box-shadow: 0 0 0 3px rgba(106, 155, 204, 0.2);
+}
+
+.input-brutal::placeholder {
+  color: var(--color-gray);
+}
+
+/* ============================================
+   USER CARD (Sidebar)
+   ============================================ */
+
+.user-card {
+  background-color: var(--color-accent-purple);
+  color: white;
+  padding: var(--space-lg);
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  overflow: hidden;
+}
+
+.user-card::before {
+  content: '';
+  position: absolute;
+  top: -50px;
+  right: -50px;
+  width: 200px;
+  height: 200px;
+  background: repeating-conic-gradient(
+    from 0deg,
+    var(--color-accent) 0deg 5deg,
+    transparent 5deg 10deg
+  );
+  border-radius: 50%;
+  opacity: 0.8;
+  mix-blend-mode: hard-light;
+}
+
+.user-card .stat-big {
+  font-size: 3rem;
+  line-height: 1;
+  color: var(--color-accent);
+}
+
+/* ============================================
+   IMPORT AREA
+   ============================================ */
+
+.import-area {
+  padding: var(--space-xl);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: var(--border-width) solid var(--color-dark);
+  background-image: radial-gradient(var(--color-dark) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.import-box {
+  background: white;
+  border: 1px solid black;
+  padding: var(--space-lg) var(--space-xl);
+  text-align: center;
+  box-shadow: 8px 8px 0px var(--color-accent-purple);
+  transition: transform var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
+  cursor: pointer;
+}
+
+.import-box:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 10px 10px 0px var(--color-accent);
+}
+
+/* ============================================
+   FEED ITEM (Mobile Style - ref1)
+   ============================================ */
+
+.feed-item {
+  padding: var(--space-md);
+  border-bottom: var(--border-width) solid var(--color-dark);
+  display: flex;
+  gap: 12px;
+}
+
+.feed-item:last-child {
+  border-bottom: none;
+}
+
+.feed-avatar {
+  width: 40px;
+  height: 40px;
+  background: var(--color-dark);
+  border-radius: 50%;
+  color: var(--color-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display), sans-serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.feed-avatar.alt {
+  background: var(--color-accent-pink);
+  color: white;
+}
+
+.code-snippet {
+  background: rgba(255, 255, 255, 0.4);
+  border: var(--border-width) solid var(--color-dark);
+  padding: var(--space-sm);
+  margin-top: var(--space-sm);
+  font-size: 0.7rem;
+  font-family: monospace;
+  color: var(--color-dark);
+}
+
+/* ============================================
+   HISTORY/TIMELINE STYLES (ref2)
+   ============================================ */
+
+.day-divider {
+  background: var(--color-sand);
+  padding: var(--space-sm) var(--space-lg);
+  border-bottom: var(--border-width) solid var(--color-dark);
+  position: sticky;
+  top: 0;
+  z-index: 9;
+}
+
+.history-item {
+  border-bottom: var(--border-width) solid var(--color-dark);
+  display: flex;
+  flex-direction: column;
+  transition: background var(--duration-fast) ease;
+}
+
+.history-item:hover {
+  background-color: var(--color-sand);
+}
+
+.history-item .item-summary {
+  padding: var(--space-lg);
+  display: grid;
+  grid-template-columns: 80px 1.5fr 1fr 1fr 120px;
+  gap: var(--space-md);
+  align-items: center;
+  cursor: pointer;
+}
+
+.history-item .item-details {
+  display: none;
+  padding: var(--space-lg);
+  background: #fcfcfc;
+  border-top: 1px dashed #ccc;
+}
+
+.history-item.expanded .item-details {
+  display: block;
+}
+
+.metric-price {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+/* ============================================
+   LEADERBOARD TABLE (ref3)
+   ============================================ */
+
+.leaderboard-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.leaderboard-row {
+  border-bottom: var(--border-width) solid var(--color-dark);
+}
+
+.leaderboard-cell {
+  padding: 12px 16px;
+}
+
+.rank-cell {
+  width: 40px;
+  text-align: center;
+  background: var(--color-dark);
+  color: var(--color-light);
+  font-family: var(--font-display), sans-serif;
+  font-weight: 700;
+}
+
+/* ============================================
+   TAB STRIP (Mobile - ref1)
+   ============================================ */
+
+.tab-strip {
+  display: flex;
+  border-bottom: var(--border-width) solid var(--color-dark);
+  background: var(--color-light);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.tab-strip .tab {
+  flex: 1;
+  padding: 12px;
+  text-align: center;
+  border-right: var(--border-width) solid var(--color-dark);
+  cursor: pointer;
+  position: relative;
+  background: transparent;
+  transition: background var(--duration-fast) ease;
+  font-family: var(--font-display), sans-serif;
+  font-weight: 500;
+  text-transform: uppercase;
+  font-size: 0.875rem;
+}
+
+.tab-strip .tab:last-child {
+  border-right: none;
+}
+
+.tab-strip .tab.active {
+  background: var(--color-accent-pink);
+  color: white;
+}
+
+.tab-strip .tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 6px solid var(--color-light);
+}
+
+/* ============================================
+   ACTIONS BAR
+   ============================================ */
+
+.actions-bar {
+  display: flex;
+  border-bottom: var(--border-width) solid var(--color-dark);
+  background: var(--color-light);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.action-btn {
+  padding: var(--space-md) var(--space-lg);
+  border-right: var(--border-width) solid var(--color-dark);
+  background: none;
+  border-top: none;
+  border-bottom: none;
+  border-left: none;
+  font-family: var(--font-display), sans-serif;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.action-btn:hover {
+  background-color: var(--color-sand);
+}
+
+.action-btn.primary {
+  background-color: var(--color-dark);
+  color: var(--color-light);
+}
+
+.action-btn.primary:hover {
+  background-color: var(--color-accent);
+  color: var(--color-dark);
+}
+
+/* ============================================
+   MOBILE HEADER (ref1 style)
+   ============================================ */
+
+@media (max-width: 767px) {
+  .mobile-header {
+    background-color: var(--color-accent-orange);
+    padding: var(--space-md);
+    border-bottom: var(--border-width) solid var(--color-dark);
+    display: flex;
+    flex-direction: column;
+    min-height: 200px;
+  }
+
+  .mobile-header .header-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: var(--space-lg);
+  }
+
+  .mobile-header .stats-ticker {
+    display: flex;
+    gap: var(--space-md);
+    margin-top: auto;
+    border-top: var(--border-width) solid var(--color-dark);
+    padding-top: 12px;
+  }
+}
+
+/* ============================================
+   PILL BUTTON
+   ============================================ */
+
+.pill-btn {
+  background: var(--color-dark);
+  color: var(--color-accent);
+  padding: 12px 24px;
+  border-radius: 999px;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  cursor: pointer;
+  box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.1);
+  font-family: var(--font-display), sans-serif;
+  font-weight: 500;
+  text-transform: uppercase;
+  font-size: 0.875rem;
+}
+
+.pill-btn:hover {
+  background: var(--color-accent);
+  color: var(--color-dark);
+}
+
+/* ============================================
+   SIDE ACCENT BAR
+   ============================================ */
+
+.side-accent {
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--color-accent-pink);
+  z-index: 30;
+}
+
+/* ============================================
+   FEED CONTAINER & HEADER
+   ============================================ */
+
+.feed-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.feed-header {
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: var(--border-width) solid var(--color-dark);
+  gap: var(--space-md);
+}
+
+.col-head {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+.no-underline {
+  text-decoration: none;
+}
+
+.font-display {
+  font-family: var(--font-display), sans-serif;
+}
+
+.font-body {
+  font-family: var(--font-body), sans-serif;
+}
+
+.normal-case {
+  text-transform: none;
+}
+
+/* ============================================
+   SCROLLBAR STYLING
+   ============================================ */
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
