@@ -8,9 +8,10 @@ import type { PostWithDetails } from '@/types';
 interface PostListProps {
   initialPosts: PostWithDetails[];
   initialCursor?: string | null;
+  currentUserId?: string | null;
 }
 
-export function PostList({ initialPosts, initialCursor }: PostListProps) {
+export function PostList({ initialPosts, initialCursor, currentUserId }: PostListProps) {
   const [posts, setPosts] = useState<PostWithDetails[]>(initialPosts);
   const [cursor, setCursor] = useState<string | null>(initialCursor || null);
   const [isLoading, setIsLoading] = useState(false);
@@ -58,6 +59,17 @@ export function PostList({ initialPosts, initialCursor }: PostListProps) {
     return () => observer.disconnect();
   }, [loadMore, hasMore, isLoading]);
 
+  const handlePostUpdate = useCallback(
+    (postId: string, updates: { description?: string; images?: string[] }) => {
+      setPosts((prev) =>
+        prev.map((post) =>
+          post.id === postId ? { ...post, ...updates } : post
+        )
+      );
+    },
+    []
+  );
+
   if (posts.length === 0) {
     return (
       <div className="text-center py-12">
@@ -72,7 +84,12 @@ export function PostList({ initialPosts, initialCursor }: PostListProps) {
   return (
     <div className="space-y-4">
       {posts.map((post) => (
-        <PostCard key={post.id} post={post} />
+        <PostCard
+          key={post.id}
+          post={post}
+          onPostUpdate={handlePostUpdate}
+          currentUserId={currentUserId}
+        />
       ))}
 
       {/* Loader / sentinel element */}

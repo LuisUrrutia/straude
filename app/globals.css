@@ -306,28 +306,13 @@ body {
   overflow: hidden;
 }
 
-.user-card::before {
-  content: '';
-  position: absolute;
-  top: -50px;
-  right: -50px;
-  width: 200px;
-  height: 200px;
-  background: repeating-conic-gradient(
-    from 0deg,
-    var(--color-accent) 0deg 5deg,
-    transparent 5deg 10deg
-  );
-  border-radius: 50%;
-  opacity: 0.8;
-  mix-blend-mode: hard-light;
-}
 
 .user-card .stat-big {
   font-size: 3rem;
   line-height: 1;
   color: var(--color-accent);
 }
+
 
 /* ============================================
    IMPORT AREA

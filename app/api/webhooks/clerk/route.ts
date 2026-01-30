@@ -58,6 +58,7 @@ export async function POST(req: Request) {
         (acc) => acc.provider === 'oauth_github'
       );
       const githubUsername = githubAccount?.username || null;
+      const username = evt.data.username?.toLowerCase() || `user_${id.slice(-8)}`;
 
       // For new users, we just store the clerk_id
       // The rest of the profile is completed during onboarding
@@ -65,7 +66,7 @@ export async function POST(req: Request) {
       const { error } = await supabase.from('users').insert({
         clerk_id: id,
         // Generate temporary username from email or random
-        username: `user_${id.slice(-8)}`,
+        username,
         avatar_url: image_url,
         github_username: githubUsername,
         // These will be set during onboarding
@@ -85,11 +86,17 @@ export async function POST(req: Request) {
 
     case 'user.updated': {
       const { id, image_url } = evt.data;
+      const username = evt.data.username?.toLowerCase();
 
       // Only update avatar if changed
       const { error } = await supabase
         .from('users')
-        .update({ avatar_url: image_url } as never)
+        .update(
+          {
+            avatar_url: image_url,
+            ...(username ? { username } : {}),
+          } as never
+        )
         .eq('clerk_id', id);
 
       if (error) {

@@ -6,12 +6,14 @@ import Image from 'next/image';
 import { formatDistanceToNow } from '@/lib/utils/date';
 import { formatCurrency, formatNumber } from '@/lib/utils/format';
 import { LikeButton } from '@/components/social/like-button';
-import { MessageCircle, Share2, CheckCircle } from 'lucide-react';
+import { MessageCircle, Share2, CheckCircle, Pencil, X, Check, ImagePlus, Loader2, Trash2 } from 'lucide-react';
 import type { PostWithDetails } from '@/types';
 
 interface PostCardProps {
   post: PostWithDetails;
   onLike?: (postId: string) => void;
+  onPostUpdate?: (postId: string, updates: { description?: string; images?: string[] }) => void;
+  currentUserId?: string | null;
 }
 
 function getInitial(name: string): string {
@@ -23,8 +25,15 @@ function getAvatarStyle(index: number): string {
   return index % 3 === 1 ? 'alt' : '';
 }
 
-export function PostCard({ post, onLike }: PostCardProps) {
+export function PostCard({ post, onLike, onPostUpdate, currentUserId }: PostCardProps) {
   const [timeLabel, setTimeLabel] = useState('...');
+  const [isEditing, setIsEditing] = useState(false);
+  const [caption, setCaption] = useState(post.description || '');
+  const [images, setImages] = useState<string[]>(post.images || []);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const isOwnPost = currentUserId ? currentUserId === post.user_id : false;
 
   useEffect(() => {
     setTimeLabel(formatDistanceToNow(post.created_at));
@@ -33,6 +42,59 @@ export function PostCard({ post, onLike }: PostCardProps) {
   const handleShare = () => {
     const url = `${window.location.origin}/posts/${post.id}`;
     navigator.clipboard.writeText(url);
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const res = await fetch(`/api/posts/${post.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: caption, images }),
+      });
+      if (res.ok) {
+        setIsEditing(false);
+        onPostUpdate?.(post.id, { description: caption, images });
+      }
+    } catch (e) {
+      console.error('Failed to update post', e);
+    }
+    setIsSaving(false);
+  };
+
+  const handleCancelEdit = () => {
+    setCaption(post.description || '');
+    setImages(post.images || []);
+    setIsEditing(false);
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (res.ok) {
+        const { url } = await res.json();
+        setImages((prev) => [...prev, url]);
+      }
+    } catch (e) {
+      console.error('Failed to upload image', e);
+    }
+    setIsUploading(false);
+    e.target.value = '';
+  };
+
+  const handleRemoveImage = (index: number) => {
+    setImages((prev) => prev.filter((_, i) => i !== index));
   };
 
   const displayName = post.user.display_name || post.user.username;
@@ -74,9 +136,90 @@ export function PostCard({ post, onLike }: PostCardProps) {
           </span>
         </div>
 
-        {/* Description */}
-        {post.description && (
-          <p className="text-sm mb-2">{post.description}</p>
+        {/* Description / Caption */}
+        {isEditing ? (
+          <div className="mb-2 space-y-2">
+            <textarea
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+              placeholder="Add a caption..."
+              className="w-full text-sm p-2 border border-dark resize-none focus:outline-none focus:ring-1 focus:ring-accent"
+              rows={2}
+              autoFocus
+            />
+
+            {/* Image preview during edit */}
+            {images.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {images.map((img, idx) => (
+                  <div key={idx} className="relative w-16 h-16 border border-dark">
+                    <Image src={img} alt="" fill className="object-cover" />
+                    <button
+                      onClick={() => handleRemoveImage(idx)}
+                      className="absolute -top-1 -right-1 bg-error text-white rounded-full p-0.5"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="flex items-center gap-1 text-xs text-success hover:text-dark"
+              >
+                <Check className="size-3" />
+                {isSaving ? 'Saving...' : 'Save'}
+              </button>
+              <button
+                onClick={handleCancelEdit}
+                className="flex items-center gap-1 text-xs text-gray hover:text-dark"
+              >
+                <X className="size-3" />
+                Cancel
+              </button>
+              <label className="flex items-center gap-1 text-xs text-gray hover:text-dark cursor-pointer ml-auto">
+                {isUploading ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <ImagePlus className="size-3" />
+                )}
+                <span>{isUploading ? 'Uploading...' : 'Add photo'}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  disabled={isUploading}
+                  className="hidden"
+                />
+              </label>
+            </div>
+          </div>
+        ) : (
+          <div className="mb-2 group/caption">
+            {post.description ? (
+              <p className="text-sm inline">{post.description}</p>
+            ) : isOwnPost ? (
+              <button
+                onClick={() => setIsEditing(true)}
+                className="text-sm text-gray hover:text-dark italic"
+              >
+                Add a caption...
+              </button>
+            ) : null}
+            {isOwnPost && (
+              <button
+                onClick={() => setIsEditing(true)}
+                className={`ml-2 text-gray hover:text-dark transition-opacity ${post.description ? 'opacity-0 group-hover/caption:opacity-100' : ''}`}
+                title="Edit post"
+              >
+                <Pencil className="size-3 inline" />
+              </button>
+            )}
+          </div>
         )}
 
         {/* Usage Stats */}

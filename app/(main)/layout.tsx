@@ -14,10 +14,8 @@ export default function MainLayout({
       <div className="side-accent hidden md:block" />
 
       {/* Desktop Layout */}
-      <div className="hidden md:grid md:grid-cols-[320px_1fr] min-h-dvh border border-dark m-4 max-w-[1600px] mx-auto">
-        <div className="flex flex-col">
-          <Sidebar />
-        </div>
+      <div className="hidden md:grid md:grid-cols-[320px_1fr] border border-dark m-4 max-w-[1600px] mx-auto" style={{ minHeight: 'calc(100dvh - 2rem)' }}>
+        <Sidebar />
         <div className="flex flex-col">
           <Header />
           <main className="flex-1 overflow-auto bg-light">

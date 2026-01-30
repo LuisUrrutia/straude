@@ -4,6 +4,13 @@ import { NextRequest } from 'next/server';
 // Mock dependencies
 vi.mock('@clerk/nextjs/server', () => ({
   auth: vi.fn(),
+  clerkClient: {
+    users: {
+      getUserList: vi.fn(),
+      updateUser: vi.fn(),
+      getUser: vi.fn(),
+    },
+  },
 }));
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -16,7 +23,7 @@ import { POST as pollCliAuth } from '@/app/api/auth/cli/poll/route';
 import { POST as verifyCliAuth } from '@/app/api/auth/cli/verify/route';
 import { GET as checkUsername } from '@/app/api/users/check-username/route';
 import { POST as onboarding } from '@/app/api/users/me/onboarding/route';
-import { auth } from '@clerk/nextjs/server';
+import { auth, clerkClient } from '@clerk/nextjs/server';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 
 describe('POST /api/auth/cli/init', () => {
@@ -150,6 +157,8 @@ describe('GET /api/users/check-username', () => {
   });
 
   it('returns available for new username', async () => {
+    vi.mocked(clerkClient.users.getUserList).mockResolvedValue({ data: [] } as never);
+
     const mockSupabase = {
       from: vi.fn().mockReturnValue({
         select: vi.fn().mockReturnThis(),
@@ -169,6 +178,8 @@ describe('GET /api/users/check-username', () => {
   });
 
   it('returns unavailable for taken username', async () => {
+    vi.mocked(clerkClient.users.getUserList).mockResolvedValue({ data: [] } as never);
+
     const mockSupabase = {
       from: vi.fn().mockReturnValue({
         select: vi.fn().mockReturnThis(),
@@ -205,6 +216,7 @@ describe('POST /api/users/me/onboarding', () => {
 
   it('returns 401 when not authenticated', async () => {
     vi.mocked(auth).mockResolvedValue({ userId: null } as never);
+    vi.mocked(clerkClient.users.getUserList).mockResolvedValue({ data: [] } as never);
 
     const request = new NextRequest('http://localhost:3000/api/users/me/onboarding', {
       method: 'POST',
@@ -225,6 +237,7 @@ describe('POST /api/users/me/onboarding', () => {
 
   it('validates username format', async () => {
     vi.mocked(auth).mockResolvedValue({ userId: 'clerk-123' } as never);
+    vi.mocked(clerkClient.users.getUserList).mockResolvedValue({ data: [] } as never);
 
     const request = new NextRequest('http://localhost:3000/api/users/me/onboarding', {
       method: 'POST',
@@ -245,6 +258,7 @@ describe('POST /api/users/me/onboarding', () => {
 
   it('validates username length', async () => {
     vi.mocked(auth).mockResolvedValue({ userId: 'clerk-123' } as never);
+    vi.mocked(clerkClient.users.getUserList).mockResolvedValue({ data: [] } as never);
 
     const request = new NextRequest('http://localhost:3000/api/users/me/onboarding', {
       method: 'POST',
@@ -265,6 +279,8 @@ describe('POST /api/users/me/onboarding', () => {
 
   it('returns 409 for taken username', async () => {
     vi.mocked(auth).mockResolvedValue({ userId: 'clerk-123' } as never);
+    vi.mocked(clerkClient.users.getUserList).mockResolvedValue({ data: [] } as never);
+    vi.mocked(clerkClient.users.updateUser).mockResolvedValue({} as never);
 
     const mockSupabase = {
       from: vi.fn().mockReturnValue({

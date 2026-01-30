@@ -12,23 +12,29 @@ export function Header() {
             STRAUDE<span className="text-accent">.</span>
           </h1>
         </Link>
-        <div className="type-mono-look mt-1">Claude Usage Tracker // v1.0</div>
+        <div className="type-mono-look mt-1">Your Coding Rhythm</div>
       </div>
 
       <div className="flex items-end gap-8">
         {/* Global Stats */}
         <div className="hidden md:flex gap-12">
-          <div className="flex flex-col items-end">
+          <div className="flex flex-col items-end group relative cursor-help">
             <span className="text-xs uppercase opacity-60">Total Global Tokens</span>
             <span className="type-display-condensed text-lg">
               45<span className="slash-sep">/</span>892<span className="slash-sep">/</span>001
             </span>
+            <div className="absolute top-full mt-2 right-0 bg-dark text-light text-xs px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+              Total tokens used across all Straude users
+            </div>
           </div>
-          <div className="flex flex-col items-end">
+          <div className="flex flex-col items-end group relative cursor-help">
             <span className="text-xs uppercase opacity-60">Est. Cost</span>
             <span className="type-display-condensed text-lg">
               $4<span className="slash-sep">/</span>120.50
             </span>
+            <div className="absolute top-full mt-2 right-0 bg-dark text-light text-xs px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+              Estimated total API spend across all users
+            </div>
           </div>
         </div>
 

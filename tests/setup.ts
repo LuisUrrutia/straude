@@ -29,6 +29,13 @@ vi.mock('next/headers', () => ({
 vi.mock('@clerk/nextjs/server', () => ({
   auth: vi.fn(() => Promise.resolve({ userId: null })),
   currentUser: vi.fn(() => Promise.resolve(null)),
+  clerkClient: {
+    users: {
+      getUserList: vi.fn(() => Promise.resolve({ data: [] })),
+      updateUser: vi.fn(() => Promise.resolve({})),
+      getUser: vi.fn(() => Promise.resolve({ username: null })),
+    },
+  },
 }));
 
 // Mock Supabase

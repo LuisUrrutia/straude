@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
+import { auth, clerkClient } from '@clerk/nextjs/server';
 import { createClient } from '@/lib/supabase/server';
 import { z } from 'zod';
 
@@ -31,14 +31,32 @@ export async function POST(request: NextRequest) {
   }
 
   const { username, country, region, is_public, bio, link, timezone } = parsed.data;
+  const normalizedUsername = username.toLowerCase();
 
   const supabase = await createClient();
+
+  // Check if username is taken in Clerk (source of truth)
+  try {
+    const clerkResults = await clerkClient.users.getUserList({
+      query: normalizedUsername,
+      limit: 10,
+    });
+    const clerkTaken = clerkResults.data.some(
+      (user) => user.username?.toLowerCase() === normalizedUsername && user.id !== userId
+    );
+    if (clerkTaken) {
+      return NextResponse.json({ error: 'Username already taken' }, { status: 409 });
+    }
+  } catch (error) {
+    console.error('Error checking Clerk username:', error);
+    return NextResponse.json({ error: 'Clerk lookup failed' }, { status: 500 });
+  }
 
   // Check if username is taken
   const { data: existingUser } = await supabase
     .from('users')
     .select('id')
-    .eq('username', username)
+    .eq('username', normalizedUsername)
     .neq('clerk_id', userId)
     .maybeSingle();
 
@@ -46,12 +64,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Username already taken' }, { status: 409 });
   }
 
+  // Update Clerk username first (canonical source)
+  try {
+    await clerkClient.users.updateUser(userId, { username: normalizedUsername });
+  } catch (error) {
+    console.error('Error updating Clerk username:', error);
+    return NextResponse.json({ error: 'Failed to update username' }, { status: 500 });
+  }
+
   // Upsert user profile (handles case where webhook hasn't fired yet)
   const { data, error } = await supabase
     .from('users')
     .upsert({
       clerk_id: userId,
-      username,
+      username: normalizedUsername,
       country,
       region,
       is_public,

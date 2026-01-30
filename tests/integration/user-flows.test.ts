@@ -9,6 +9,13 @@ import { NextRequest } from 'next/server';
 // Mock dependencies
 vi.mock('@clerk/nextjs/server', () => ({
   auth: vi.fn(),
+  clerkClient: {
+    users: {
+      getUserList: vi.fn(),
+      updateUser: vi.fn(),
+      getUser: vi.fn(),
+    },
+  },
 }));
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -16,7 +23,7 @@ vi.mock('@/lib/supabase/server', () => ({
   createAdminClient: vi.fn(),
 }));
 
-import { auth } from '@clerk/nextjs/server';
+import { auth, clerkClient } from '@clerk/nextjs/server';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 
 // Helper to create a consistent mock Supabase client for testing flows
@@ -87,6 +94,8 @@ describe('User Registration Flow', () => {
     // 3. User is redirected to feed
 
     vi.mocked(auth).mockResolvedValue({ userId: 'clerk-new-user' } as never);
+    vi.mocked(clerkClient.users.getUserList).mockResolvedValue({ data: [] } as never);
+    vi.mocked(clerkClient.users.updateUser).mockResolvedValue({} as never);
 
     // Simulate checking username availability
     const mockClient1 = createFlowMockClient({ users: [] });

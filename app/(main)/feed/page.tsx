@@ -78,7 +78,7 @@ async function getFeed() {
   const typedPosts = posts as PostRow[] | null;
 
   if (!typedPosts) {
-    return { posts: [], nextCursor: null, postCount: 0 };
+    return { posts: [], nextCursor: null, postCount: 0, currentUserId };
   }
 
   const hasMore = typedPosts.length > 20;
@@ -103,11 +103,11 @@ async function getFeed() {
     })
   );
 
-  return { posts: postsWithCounts, nextCursor, postCount: postsWithCounts.length };
+  return { posts: postsWithCounts, nextCursor, postCount: postsWithCounts.length, currentUserId };
 }
 
 export default async function FeedPage() {
-  const { posts, nextCursor, postCount } = await getFeed();
+  const { posts, nextCursor, postCount, currentUserId } = await getFeed();
 
   return (
     <div className="flex flex-col h-full">
@@ -159,7 +159,11 @@ export default async function FeedPage() {
             </div>
           </div>
         ) : (
-          <PostList initialPosts={posts} initialCursor={nextCursor} />
+          <PostList
+            initialPosts={posts}
+            initialCursor={nextCursor}
+            currentUserId={currentUserId}
+          />
         )}
       </div>
 

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { Loader2, CheckCircle, AlertCircle, Copy, Check } from 'lucide-react';
 
 export default function ImportPage() {
   const router = useRouter();
@@ -12,6 +12,14 @@ export default function ImportPage() {
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [error, setError] = useState('');
   const [todayCode, setTodayCode] = useState('YYYYMMDD');
+  const [copied, setCopied] = useState(false);
+
+  const copyCommand = () => {
+    const command = `bunx ccusage daily --json --since ${todayCode} --until ${todayCode}`;
+    navigator.clipboard.writeText(command);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
@@ -43,8 +51,13 @@ export default function ImportPage() {
       let todayData;
 
       if (data.type === 'daily' && Array.isArray(data.data)) {
+        // Format: { type: 'daily', data: [...] }
         todayData = data.data.find((d: { date: string }) => d.date === today);
+      } else if (Array.isArray(data.daily)) {
+        // Format: { daily: [...], totals: {...} } (ccusage output)
+        todayData = data.daily.find((d: { date: string }) => d.date === today);
       } else if (data.date === today) {
+        // Format: single day object
         todayData = data;
       }
 
@@ -63,13 +76,13 @@ export default function ImportPage() {
           date: today,
           data: {
             date: todayData.date,
-            models: todayData.models || [],
+            models: todayData.models || todayData.modelsUsed || [],
             inputTokens: todayData.inputTokens || 0,
             outputTokens: todayData.outputTokens || 0,
             cacheCreationTokens: todayData.cacheCreationTokens || 0,
             cacheReadTokens: todayData.cacheReadTokens || 0,
             totalTokens: todayData.totalTokens || 0,
-            costUSD: todayData.costUSD || 0,
+            costUSD: todayData.costUSD ?? todayData.totalCost ?? 0,
           },
           source: 'web',
         }),
@@ -102,9 +115,17 @@ export default function ImportPage() {
         <p className="type-mono-look text-dark mb-2">
           How to get your usage data:
         </p>
-        <code className="block bg-dark text-light p-3 font-mono text-sm border border-dark">
-          ccusage daily --json --since {todayCode} --until {todayCode}
-        </code>
+        <button
+          onClick={copyCommand}
+          className="w-full flex items-center justify-between bg-dark text-light p-3 font-mono text-sm border border-dark hover:bg-gray transition-colors cursor-pointer text-left"
+        >
+          <code>bunx ccusage daily --json --since {todayCode} --until {todayCode}</code>
+          {copied ? (
+            <Check className="size-4 text-success flex-shrink-0 ml-2" />
+          ) : (
+            <Copy className="size-4 opacity-60 flex-shrink-0 ml-2" />
+          )}
+        </button>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">

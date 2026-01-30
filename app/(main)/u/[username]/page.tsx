@@ -4,6 +4,7 @@ import { auth } from '@clerk/nextjs/server';
 import { ProfileHeader } from '@/components/profile/profile-header';
 import { ContributionGraph } from '@/components/profile/contribution-graph';
 import { PostList } from '@/components/feed/post-list';
+import { TabStrip } from '@/components/feed/tab-strip';
 import type { UserProfileResponse, PostWithDetails } from '@/types';
 
 interface PageProps {
@@ -170,7 +171,9 @@ async function getContributions(userId: string, canViewStats: boolean) {
   return typedData?.map((u) => ({ date: u.date, cost_usd: Number(u.cost_usd) })) || [];
 }
 
-async function getPosts(userId: string): Promise<PostWithDetails[]> {
+async function getPosts(
+  userId: string
+): Promise<{ posts: PostWithDetails[]; currentUserId: string | null }> {
   const supabase = await createClient();
   const { userId: clerkId } = await auth();
 
@@ -185,7 +188,7 @@ async function getPosts(userId: string): Promise<PostWithDetails[]> {
     .order('created_at', { ascending: false })
     .limit(20);
 
-  if (!posts) return [];
+  if (!posts) return { posts: [], currentUserId: null };
 
   const typedPosts = posts as PostRow[];
 
@@ -199,7 +202,7 @@ async function getPosts(userId: string): Promise<PostWithDetails[]> {
     currentUserId = (currentUser as { id: string } | null)?.id || null;
   }
 
-  return Promise.all(
+  const postsWithCounts = await Promise.all(
     typedPosts.map(async (post) => {
       const [{ count: likeCount }, { count: commentCount }, liked] = await Promise.all([
         supabase.from('likes').select('*', { count: 'exact', head: true }).eq('post_id', post.id),
@@ -217,6 +220,8 @@ async function getPosts(userId: string): Promise<PostWithDetails[]> {
       } as PostWithDetails;
     })
   );
+
+  return { posts: postsWithCounts, currentUserId };
 }
 
 export async function generateMetadata({ params }: PageProps) {
@@ -235,13 +240,18 @@ export default async function ProfilePage({ params }: PageProps) {
     notFound();
   }
 
-  const [contributions, posts] = await Promise.all([
+  const [contributions, postsResult] = await Promise.all([
     getContributions(profile.id, profile.stats_visible),
     getPosts(profile.id),
   ]);
+  const { posts, currentUserId } = postsResult;
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="flex flex-col h-full">
+      {/* Mobile Tab Strip */}
+      <TabStrip />
+
+      <div className="max-w-3xl mx-auto space-y-6 p-4 md:p-6">
       <ProfileHeader user={profile} />
 
       {/* Contribution Graph */}
@@ -257,7 +267,8 @@ export default async function ProfilePage({ params }: PageProps) {
         <h2 className="type-display-condensed text-lg text-dark mb-4">
           Posts
         </h2>
-        <PostList initialPosts={posts} />
+        <PostList initialPosts={posts} currentUserId={currentUserId} />
+      </div>
       </div>
     </div>
   );
