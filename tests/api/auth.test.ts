@@ -212,6 +212,7 @@ describe('GET /api/users/check-username', () => {
 describe('POST /api/users/me/onboarding', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(clerkClient.users.getUser).mockResolvedValue({ publicMetadata: {} } as never);
   });
 
   it('returns 401 when not authenticated', async () => {

@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Validate format
-  const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
+  const usernameRegex = /^[a-z0-9_]{3,20}$/;
   if (!usernameRegex.test(usernameParam)) {
     return NextResponse.json({ available: false, error: 'Invalid format' });
   }

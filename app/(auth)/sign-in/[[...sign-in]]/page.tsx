@@ -30,7 +30,7 @@ export default function SignInPage() {
           borderRadius: '0px',
         },
       }}
-      forceRedirectUrl="/onboarding"
+      afterSignInUrl="/feed"
     />
   );
 }

@@ -64,9 +64,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Username already taken' }, { status: 409 });
   }
 
-  // Update Clerk username first (canonical source)
+  // Update Clerk username + onboarding status (canonical source)
   try {
-    await clerkClient.users.updateUser(userId, { username: normalizedUsername });
+    const clerkUser = await clerkClient.users.getUser(userId);
+    const publicMetadata = clerkUser.publicMetadata || {};
+
+    await clerkClient.users.updateUser(userId, {
+      username: normalizedUsername,
+      publicMetadata: {
+        ...publicMetadata,
+        onboardingCompleted: true,
+      },
+    });
   } catch (error) {
     console.error('Error updating Clerk username:', error);
     return NextResponse.json({ error: 'Failed to update username' }, { status: 500 });
@@ -96,5 +105,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Database error' }, { status: 500 });
   }
 
-  return NextResponse.json({ user: data });
+  const response = NextResponse.json({ user: data });
+  response.cookies.set('onboarding_completed', 'true', {
+    path: '/',
+    maxAge: 60 * 60 * 24 * 365,
+  });
+  return response;
 }

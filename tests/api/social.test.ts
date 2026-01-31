@@ -4,6 +4,13 @@ import { NextRequest } from 'next/server';
 // Mock dependencies
 vi.mock('@clerk/nextjs/server', () => ({
   auth: vi.fn(),
+  clerkClient: {
+    users: {
+      getUserList: vi.fn(),
+      updateUser: vi.fn(),
+      getUser: vi.fn(),
+    },
+  },
 }));
 
 vi.mock('@/lib/supabase/server', () => ({

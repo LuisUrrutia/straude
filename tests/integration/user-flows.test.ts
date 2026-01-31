@@ -96,6 +96,7 @@ describe('User Registration Flow', () => {
     vi.mocked(auth).mockResolvedValue({ userId: 'clerk-new-user' } as never);
     vi.mocked(clerkClient.users.getUserList).mockResolvedValue({ data: [] } as never);
     vi.mocked(clerkClient.users.updateUser).mockResolvedValue({} as never);
+    vi.mocked(clerkClient.users.getUser).mockResolvedValue({ publicMetadata: {} } as never);
 
     // Simulate checking username availability
     const mockClient1 = createFlowMockClient({ users: [] });

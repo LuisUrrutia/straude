@@ -6,6 +6,7 @@ import { z } from 'zod';
 interface UserRow {
   id: string;
   username: string;
+  onboarding_completed?: boolean;
 }
 
 export async function GET() {
@@ -32,6 +33,8 @@ export async function GET() {
   try {
     const clerkUser = await clerkClient.users.getUser(userId);
     const clerkUsername = clerkUser.username?.toLowerCase() ?? null;
+    const publicMetadata = clerkUser.publicMetadata || {};
+    const clerkOnboarded = publicMetadata.onboardingCompleted === true;
 
     if (clerkUsername && user.username !== clerkUsername) {
       const { data: conflict } = await supabase
@@ -55,6 +58,27 @@ export async function GET() {
         .select()
         .single();
 
+      if (updatedUser) {
+        user = updatedUser as UserRow;
+      }
+    }
+
+    if (user.onboarding_completed && !clerkOnboarded) {
+      await clerkClient.users.updateUser(userId, {
+        publicMetadata: {
+          ...publicMetadata,
+          onboardingCompleted: true,
+        },
+      });
+    }
+
+    if (!user.onboarding_completed && clerkOnboarded) {
+      const { data: updatedUser } = await supabase
+        .from('users')
+        .update({ onboarding_completed: true } as never)
+        .eq('id', user.id)
+        .select()
+        .single();
       if (updatedUser) {
         user = updatedUser as UserRow;
       }

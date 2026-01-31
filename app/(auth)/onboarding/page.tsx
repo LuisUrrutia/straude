@@ -41,13 +41,17 @@ export default function OnboardingPage() {
   useEffect(() => {
     // Clear error when username is empty
     if (!formData.username) {
+      setUsernameError('');
       return;
     }
 
-    const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
+    const usernameRegex = /^[a-z0-9_]{3,20}$/;
     if (!usernameRegex.test(formData.username)) {
+      setUsernameError('Use 3-20 lowercase letters, numbers, or underscores');
       return;
     }
+
+    setUsernameError('');
 
     const timer = setTimeout(async () => {
       setIsCheckingUsername(true);

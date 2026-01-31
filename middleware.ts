@@ -24,8 +24,83 @@ const requiresOnboarding = createRouteMatcher([
   '/api/follow/(.*)',
 ]);
 
+async function fetchOnboardingCompleted(userId: string): Promise<boolean | null> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !supabaseKey) {
+    return null;
+  }
+
+  const url = new URL(`${supabaseUrl}/rest/v1/users`);
+  url.searchParams.set('select', 'onboarding_completed');
+  url.searchParams.set('clerk_id', `eq.${userId}`);
+  url.searchParams.set('limit', '1');
+
+  try {
+    const res = await fetch(url.toString(), {
+      headers: {
+        apikey: supabaseKey,
+        Authorization: `Bearer ${supabaseKey}`,
+      },
+      cache: 'no-store',
+    });
+
+    if (!res.ok) {
+      console.error('Onboarding lookup failed:', res.status);
+      return null;
+    }
+
+    const data = (await res.json()) as Array<{ onboarding_completed?: boolean }>;
+    return Boolean(data?.[0]?.onboarding_completed);
+  } catch (error) {
+    console.error('Onboarding lookup error:', error);
+    return null;
+  }
+}
+
+async function fetchClerkOnboardingCompleted(userId: string): Promise<boolean | null> {
+  const clerkKey = process.env.CLERK_SECRET_KEY;
+  if (!clerkKey) {
+    return null;
+  }
+
+  try {
+    const res = await fetch(`https://api.clerk.com/v1/users/${userId}`, {
+      headers: {
+        Authorization: `Bearer ${clerkKey}`,
+      },
+      cache: 'no-store',
+    });
+
+    if (!res.ok) {
+      console.error('Clerk onboarding lookup failed:', res.status);
+      return null;
+    }
+
+    const data = (await res.json()) as {
+      public_metadata?: Record<string, unknown>;
+      publicMetadata?: Record<string, unknown>;
+    };
+    const publicMetadata = data.public_metadata || data.publicMetadata || {};
+    const value = publicMetadata.onboardingCompleted;
+    if (value === true) return true;
+    if (value === false) return false;
+    return null;
+  } catch (error) {
+    console.error('Clerk onboarding lookup error:', error);
+    return null;
+  }
+}
+
 export default clerkMiddleware(async (auth, request) => {
-  const { userId } = await auth();
+  const { userId, sessionClaims } = await auth();
+  const claims = sessionClaims as Record<string, unknown> | null;
+  const publicMetadata =
+    (claims && (claims.publicMetadata || claims.public_metadata)) as
+      | Record<string, unknown>
+      | undefined;
+  const onboardingFromClerk = publicMetadata?.onboardingCompleted === true;
 
   // Allow public routes
   if (isPublicRoute(request)) {
@@ -44,8 +119,45 @@ export default clerkMiddleware(async (auth, request) => {
     // We'll check onboarding status via a cookie set during auth
     const onboardingCompleted = request.cookies.get('onboarding_completed')?.value === 'true';
 
-    if (!onboardingCompleted && !request.nextUrl.pathname.startsWith('/onboarding')) {
-      return NextResponse.redirect(new URL('/onboarding', request.url));
+    if (onboardingFromClerk && !onboardingCompleted) {
+      const response = NextResponse.next();
+      response.cookies.set('onboarding_completed', 'true', {
+        path: '/',
+        maxAge: 60 * 60 * 24 * 365,
+      });
+      return response;
+    }
+
+    if (!onboardingCompleted && !onboardingFromClerk) {
+      const clerkCompleted = userId ? await fetchClerkOnboardingCompleted(userId) : null;
+
+      if (clerkCompleted) {
+        const response = NextResponse.next();
+        response.cookies.set('onboarding_completed', 'true', {
+          path: '/',
+          maxAge: 60 * 60 * 24 * 365,
+        });
+        return response;
+      }
+
+      if (clerkCompleted === false && !request.nextUrl.pathname.startsWith('/onboarding')) {
+        return NextResponse.redirect(new URL('/onboarding', request.url));
+      }
+
+      const dbCompleted = userId ? await fetchOnboardingCompleted(userId) : null;
+
+      if (dbCompleted) {
+        const response = NextResponse.next();
+        response.cookies.set('onboarding_completed', 'true', {
+          path: '/',
+          maxAge: 60 * 60 * 24 * 365,
+        });
+        return response;
+      }
+
+      if (dbCompleted === false && !request.nextUrl.pathname.startsWith('/onboarding')) {
+        return NextResponse.redirect(new URL('/onboarding', request.url));
+      }
     }
   }
 
