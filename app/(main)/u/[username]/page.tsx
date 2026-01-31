@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { auth } from '@clerk/nextjs/server';
+import { auth, clerkClient } from '@clerk/nextjs/server';
 import { ProfileHeader } from '@/components/profile/profile-header';
 import { ContributionGraph } from '@/components/profile/contribution-graph';
 import { PostList } from '@/components/feed/post-list';
@@ -13,6 +13,7 @@ interface PageProps {
 
 interface UserRow {
   id: string;
+  clerk_id: string;
   username: string;
   display_name: string | null;
   bio: string | null;
@@ -59,6 +60,24 @@ async function getProfile(username: string): Promise<UserProfileResponse | null>
 
   const user = userData as UserRow | null;
   if (!user) return null;
+
+  // Fetch avatar from Clerk and sync to database
+  let avatarUrl = user.avatar_url;
+  if (user.clerk_id) {
+    try {
+      const clerkUser = await (await clerkClient()).users.getUser(user.clerk_id);
+      if (clerkUser.imageUrl) {
+        avatarUrl = clerkUser.imageUrl;
+        // Update database in background (don't await)
+        supabase
+          .from('users')
+          .update({ avatar_url: clerkUser.imageUrl } as never)
+          .eq('id', user.id);
+      }
+    } catch {
+      // Ignore Clerk errors, use database avatar
+    }
+  }
 
   let isOwnProfile = false;
   let isFollowing = false;
@@ -108,8 +127,10 @@ async function getProfile(username: string): Promise<UserProfileResponse | null>
 
     const dates = (usageDates as Array<{ date: string }> | null)?.map(d => d.date) || [];
     let streakCount = 0;
-    const today = new Date().toISOString().split('T')[0];
-    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const yesterdayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    const yesterday = `${yesterdayDate.getFullYear()}-${String(yesterdayDate.getMonth() + 1).padStart(2, '0')}-${String(yesterdayDate.getDate()).padStart(2, '0')}`;
 
     if (dates.length > 0 && (dates[0] === today || dates[0] === yesterday)) {
       streakCount = 1;
@@ -132,7 +153,7 @@ async function getProfile(username: string): Promise<UserProfileResponse | null>
     username: user.username,
     display_name: user.display_name,
     bio: user.bio,
-    avatar_url: user.avatar_url,
+    avatar_url: avatarUrl,
     country: user.country,
     region: user.region,
     link: user.link,

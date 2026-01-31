@@ -28,21 +28,22 @@ async function getLeaderboard(period: LeaderboardPeriod, region?: Region) {
     currentUserId = (user as { id: string } | null)?.id || null;
   }
 
-  // Calculate date range
+  // Calculate date range - use local time to match user-submitted dates
   const now = new Date();
+  const toLocalDateStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   let startDate: string;
 
   switch (period) {
     case 'day':
-      startDate = now.toISOString().split('T')[0];
+      startDate = toLocalDateStr(now);
       break;
     case 'week':
-      const weekAgo = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000);
-      startDate = weekAgo.toISOString().split('T')[0];
+      const weekAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+      startDate = toLocalDateStr(weekAgo);
       break;
     case 'month':
-      const monthAgo = new Date(now.getTime() - 29 * 24 * 60 * 60 * 1000);
-      startDate = monthAgo.toISOString().split('T')[0];
+      const monthAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
+      startDate = toLocalDateStr(monthAgo);
       break;
     case 'all_time':
     default:

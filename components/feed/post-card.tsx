@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { motion } from 'motion/react';
 import { formatDistanceToNow } from '@/lib/utils/date';
 import { formatCurrency, formatNumber } from '@/lib/utils/format';
 import { LikeButton } from '@/components/social/like-button';
@@ -101,24 +102,34 @@ export function PostCard({ post, onLike, onPostUpdate, currentUserId }: PostCard
   const initial = getInitial(displayName);
 
   return (
-    <article className="feed-item">
+    <motion.article
+      className="feed-item"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2, ease: 'easeOut' }}
+    >
       {/* Avatar */}
       <Link href={`/u/${post.user.username}`}>
-        {post.user.avatar_url ? (
-          <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 border border-dark">
-            <Image
-              src={post.user.avatar_url}
-              alt={post.user.username}
-              width={40}
-              height={40}
-              className="object-cover"
-            />
-          </div>
-        ) : (
-          <div className="feed-avatar">
-            {initial}
-          </div>
-        )}
+        <motion.div
+          whileHover={{ scale: 1.05 }}
+          transition={{ duration: 0.15 }}
+        >
+          {post.user.avatar_url ? (
+            <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 border border-dark">
+              <Image
+                src={post.user.avatar_url}
+                alt={post.user.username}
+                width={40}
+                height={40}
+                className="object-cover"
+              />
+            </div>
+          ) : (
+            <div className="feed-avatar">
+              {initial}
+            </div>
+          )}
+        </motion.div>
       </Link>
 
       {/* Content */}
@@ -279,14 +290,16 @@ export function PostCard({ post, onLike, onPostUpdate, currentUserId }: PostCard
             <MessageCircle className="size-4" />
             <span className="text-sm">{post.comment_count}</span>
           </Link>
-          <button
+          <motion.button
             onClick={handleShare}
             className="flex items-center gap-1.5 text-gray hover:text-dark transition-colors ml-auto"
+            whileTap={{ scale: 0.95 }}
+            transition={{ duration: 0.1 }}
           >
             <Share2 className="size-4" />
-          </button>
+          </motion.button>
         </div>
       </div>
-    </article>
+    </motion.article>
   );
 }

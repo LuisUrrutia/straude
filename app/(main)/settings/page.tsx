@@ -11,7 +11,7 @@ import type { User } from '@/types';
 
 export default function SettingsPage() {
   const router = useRouter();
-  useUser(); // Check user is authenticated
+  const { user: clerkUser } = useUser();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -90,7 +90,7 @@ export default function SettingsPage() {
         {/* Avatar */}
         <div className="flex items-center gap-6">
           <Avatar
-            src={user?.avatar_url}
+            src={clerkUser?.imageUrl}
             alt={user?.username || ''}
             size="lg"
           />

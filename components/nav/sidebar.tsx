@@ -111,7 +111,7 @@ export function Sidebar() {
       {/* Status */}
       <div className="p-6 border-t border-dark mt-auto">
         <div className="type-mono-look">API Status: Online</div>
-        <div className="type-mono-look text-accent-purple">Syncing...</div>
+        <div className="type-mono-look text-gray">Syncing...</div>
       </div>
     </aside>
   );

@@ -31,10 +31,19 @@ export async function GET() {
   }
 
   try {
-    const clerkUser = await clerkClient.users.getUser(userId);
+    const clerkUser = await (await clerkClient()).users.getUser(userId);
     const clerkUsername = clerkUser.username?.toLowerCase() ?? null;
+    const clerkAvatarUrl = clerkUser.imageUrl ?? null;
     const publicMetadata = clerkUser.publicMetadata || {};
     const clerkOnboarded = publicMetadata.onboardingCompleted === true;
+
+    // Sync avatar_url from Clerk
+    if (clerkAvatarUrl) {
+      await supabase
+        .from('users')
+        .update({ avatar_url: clerkAvatarUrl } as never)
+        .eq('id', user.id);
+    }
 
     if (clerkUsername && user.username !== clerkUsername) {
       const { data: conflict } = await supabase
@@ -64,7 +73,7 @@ export async function GET() {
     }
 
     if (user.onboarding_completed && !clerkOnboarded) {
-      await clerkClient.users.updateUser(userId, {
+      await (await clerkClient()).users.updateUser(userId, {
         publicMetadata: {
           ...publicMetadata,
           onboardingCompleted: true,

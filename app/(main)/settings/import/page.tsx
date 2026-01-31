@@ -22,7 +22,8 @@ export default function ImportPage() {
   };
 
   useEffect(() => {
-    const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
+    const now = new Date();
+    const today = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
     setTodayCode(today);
   }, []);
 
@@ -47,7 +48,8 @@ export default function ImportPage() {
       }
 
       // Find today's entry
-      const today = new Date().toISOString().split('T')[0];
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       let todayData;
 
       if (data.type === 'daily' && Array.isArray(data.data)) {

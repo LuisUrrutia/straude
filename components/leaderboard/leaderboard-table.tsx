@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import { motion } from 'motion/react';
 import { formatCurrency, formatNumber } from '@/lib/utils/format';
 import { clsx } from 'clsx';
 import type { LeaderboardEntryWithRank } from '@/types';
@@ -31,23 +32,32 @@ export function LeaderboardTable({ entries, currentUserId }: LeaderboardTablePro
 
   return (
     <div className="feed-container">
-      {entries.map((entry) => {
+      {entries.map((entry, index) => {
         const isCurrentUser = entry.user_id === currentUserId;
         const displayName = entry.display_name || entry.username;
 
         return (
-          <Link
+          <motion.div
             key={entry.user_id}
-            href={`/u/${entry.username}`}
-            className={clsx(
-              'feed-row grid-cols-[0.5fr_2fr_1fr] md:grid-cols-[0.5fr_2fr_1fr_1fr_1fr] no-underline text-dark',
-              isCurrentUser && 'bg-accent/10'
-            )}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{
+              duration: 0.2,
+              delay: Math.min(index * 0.03, 0.3),
+              ease: 'easeOut'
+            }}
           >
-            {/* Rank */}
-            <div className="rank text-2xl">
-              {formatRank(entry.rank)}
-            </div>
+            <Link
+              href={`/u/${entry.username}`}
+              className={clsx(
+                'feed-row grid-cols-[0.5fr_2fr_1fr] md:grid-cols-[0.5fr_2fr_1fr_1fr_1fr] no-underline text-dark',
+                isCurrentUser && 'bg-accent/10'
+              )}
+            >
+              {/* Rank */}
+              <div className="rank text-2xl">
+                {formatRank(entry.rank)}
+              </div>
 
             {/* User */}
             <div className="flex items-center gap-3 min-w-0">
@@ -87,6 +97,7 @@ export function LeaderboardTable({ entries, currentUserId }: LeaderboardTablePro
               --
             </div>
           </Link>
+          </motion.div>
         );
       })}
     </div>

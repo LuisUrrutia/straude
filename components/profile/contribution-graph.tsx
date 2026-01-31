@@ -98,12 +98,12 @@ export function ContributionGraph({ data, referenceDate }: ContributionGraphProp
         className="overflow-x-auto pb-2"
       >
         {/* Month labels - positioned relative to grid */}
-        <div className="flex text-xs text-gray mb-2 ml-8" style={{ minWidth: `${grid.length * WEEK_WIDTH + 32}px` }}>
+        <div className="relative h-4 text-xs text-gray mb-2 ml-8" style={{ minWidth: `${grid.length * WEEK_WIDTH + 32}px` }}>
           {monthLabels.map((month, idx) => (
             <span
               key={idx}
-              className="absolute"
-              style={{ marginLeft: `${month.week * WEEK_WIDTH}px` }}
+              className="absolute whitespace-nowrap"
+              style={{ left: `${month.week * WEEK_WIDTH}px` }}
             >
               {month.name}
             </span>
