@@ -86,4 +86,34 @@ describe("telemetry", () => {
 
     await expect(shutdownTelemetryWithTimeout(10)).resolves.toBeTypeOf("number");
   });
+
+  it("stays quiet when the local timer wins and the rejection lands later", async () => {
+    // posthog's own timeout and ours are both 150 ms, so the rejection can land
+    // after the local timer already resolved. Promise.race subscribes to both
+    // inputs, so that late rejection is already handled — this pins that down
+    // so a refactor away from Promise.race can't silently reintroduce a
+    // late unhandled rejection.
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+    try {
+      vi.mocked(posthog._shutdown).mockReturnValueOnce(
+        new Promise((_resolve, reject) =>
+          setTimeout(
+            () =>
+              reject(
+                "Timeout while shutting down PostHog. Some events may not have been sent.",
+              ),
+            20,
+          ),
+        ),
+      );
+
+      await expect(shutdownTelemetryWithTimeout(1)).resolves.toBeTypeOf("number");
+      await new Promise((resolve) => setTimeout(resolve, 60));
+
+      expect(unhandled).not.toHaveBeenCalled();
+    } finally {
+      process.off("unhandledRejection", unhandled);
+    }
+  });
 });

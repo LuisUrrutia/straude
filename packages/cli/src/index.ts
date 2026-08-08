@@ -246,4 +246,11 @@ main()
     }
     console.error(`Error: ${errorMessage(err)}`);
   })
-  .finally(() => shutdownTelemetryWithTimeout().then(() => process.exit(exitCode)));
+  .finally(() =>
+    // Telemetry shutdown must never decide whether the process exits: if it
+    // rejects, `.then` is skipped and the CLI hangs on the event loop with an
+    // unhandled rejection instead of returning its exit code.
+    shutdownTelemetryWithTimeout()
+      .catch(() => {})
+      .then(() => process.exit(exitCode)),
+  );
