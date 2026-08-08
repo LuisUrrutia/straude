@@ -4,7 +4,9 @@
 
 ### Fixed
 
-- **Post OG/Twitter cards no longer 500 on webp images.** Satori (next/og) can't decode webp, so a webp hero image or avatar (even one with a `.jpg` extension) crashed the whole `/post/[id]` card render in production. Images are now fetched server-side, format-sniffed via magic bytes, and passed through as data URIs only when satori supports them (PNG/JPEG/GIF); unsupported or unfetchable images fall back to the existing no-image layout.
+- **Share cards no longer 500 on webp images.** Satori (next/og) can't decode webp, so a webp hero image or avatar (even one with a `.jpg` extension) crashed the whole card render in production. `lib/og-safe-image.ts` now fetches images server-side, format-sniffs them via magic bytes, and passes them through as data URIs only when satori supports them (PNG/JPEG/GIF); unsupported or unfetchable images fall back to the existing no-image layout. Applied to all three affected routes — `/post/[id]` (OG + Twitter), `/api/posts/[id]/share-image`, and `/join/[username]`.
+
+- **OG image loaders no longer fetch arbitrary user-controlled URLs.** `users.avatar_url` is stored verbatim from `PATCH /api/users/me`, so a server-side fetch of it was an SSRF probe. Both loaders now apply the same storage allowlist `/api/posts/[id]/share-image` already used (`isAllowedAvatarUrl` for avatars, the `post-images` bucket for hero images) and never fetch anything outside it. Fetches are also bounded by a 3 s deadline and a 5 MiB cap so a slow or oversized third-party response can't hold the render open or exhaust function memory.
 
 - **The CLI now waits for and renders the scorecard after a successful sync.** A healthy dashboard response taking longer than 1.5 seconds is no longer discarded with a suggestion to run `straude status` separately.
 
