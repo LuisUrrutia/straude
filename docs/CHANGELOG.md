@@ -2,9 +2,11 @@
 
 ## Unreleased
 
-### Changed
+### Fixed
 
-- **Extracted `ActivityCard`'s hardcoded model chip colors** into `apps/web/lib/constants/model-colors.ts` (`MODEL_COLOR_PATTERNS`, `MODEL_COLOR_FALLBACK_PALETTE`). No visual change — same colors, same matching order — just moved out of the component per the design-system-consistency roadmap item.
+- **Model chips no longer render colourless for unknown models.** The fallback palette was indexed with a signed 32-bit hash, so any model name that hashed negative indexed off the front of the array and handed the chip an `undefined` background — about half of all names, hidden from TypeScript by a non-null assertion. Now that collection accepts every ccusage source, real names like `kimi-k2` and `deepseek-v3` hit this. The hash is folded to a positive index and the mapping is covered by unit tests.
+
+- **The CLI now waits for and renders the scorecard after a successful sync.** A healthy dashboard response taking longer than 1.5 seconds is no longer discarded with a suggestion to run `straude status` separately.
 
 ### Added
 
@@ -12,9 +14,13 @@
 
 ### Changed
 
+- **Extracted `ActivityCard`'s hardcoded model chip colors** into `apps/web/lib/constants/model-colors.ts`, which now owns the whole name-to-colour decision (`modelColor`) rather than exporting raw tables for callers to recombine. Same colors, same matching order, per the design-system-consistency roadmap item.
+
+- **All ccusage sources and the OpenAI GPT-5.6 family are now tracked.** The CLI dependency floor is `ccusage@20.0.16`, the first release with `gpt-5.6`, `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna` plus request-level long-context pricing. Collection now uses current online LiteLLM pricing by default, avoiding stale embedded-price estimates. Unified rows are no longer filtered to Claude/Codex: Straude accepts every source ID emitted by ccusage, carries each row's source IDs through submission metadata, and retains source-aware handling for trusted Codex corrections. A real bundled-binary fixture locks the four GPT-5.6 variants to 440,000 total tokens and $1.917 in API-equivalent spend at the current LiteLLM rates.
+
 - **Activation funnel events are now captured exclusively server-side.** `trackActivationEvent` no longer double-captures via browser posthog-js for consented users; the consent-exempt, privacy-limited server path (which owns anonymous→user identity stitching) is the single source of truth for funnel math.
 
-- **Unified usage collection on ccusage v20 for both Claude Code and Codex.** The CLI now bundles `ccusage@20.0.8` and invokes its native binary directly (no global install, no PATH lookup), replacing Straude's native Codex collector, token normalizer, pricing aliases, and fingerprinting code (~1,500 lines removed). A single `ccusage daily --json --no-offline` run produces unified Claude+Codex rows with `metadata.agents`; ccusage owns raw-session parsing, dedupe, token accounting, and online pricing. The 20.0.7/20.0.8 releases specifically fix Codex accuracy: archived-session inclusion + dedupe, skipping replayed parent token history in `thread_spawn` subagent sessions, and goal-rollout event dedupe. New `reasoning_output_tokens` column on `daily_usage`/`device_usage` (derived as the residual of authoritative `totalTokens`), collector metadata (`ccusage_version`, `ccusage_agents`, `pricing_mode`) persisted per row, and a one-time 30-day backfill on the first post-migration push (`ccusage_v20_migration_completed_at` config marker). The server rejects unsupported agents and non-online pricing; the new `ccusage-codex-v20` collector joins the trusted set so corrected uploads can lower inflated Codex totals.
+- **Unified usage collection on ccusage v20.** The CLI invokes ccusage's native binary directly (no global install or PATH lookup), replacing Straude's native Codex collector, token normalizer, pricing aliases, and fingerprinting code (~1,500 lines removed). A single unified daily report lets ccusage own raw-session parsing, dedupe, token accounting, and pricing. New `reasoning_output_tokens` columns on `daily_usage`/`device_usage`, collector metadata (`ccusage_version`, `ccusage_agents`, `pricing_mode`) persisted per row, and a one-time 30-day backfill on the first post-migration push (`ccusage_v20_migration_completed_at` config marker). The `ccusage-codex-v20` collector joins the trusted set so corrected Codex uploads can lower inflated totals.
 
 ### Security
 

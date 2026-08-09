@@ -13,10 +13,7 @@ export { prettifyModel } from "@straude/shared/models";
 import { cn } from "@/lib/utils/cn";
 import { formatCurrency, formatTokens } from "@/lib/utils/format";
 import { mentionsToMarkdownLinks } from "@/lib/utils/mentions";
-import {
-  MODEL_COLOR_FALLBACK_PALETTE,
-  MODEL_COLOR_PATTERNS,
-} from "@/lib/constants/model-colors";
+import { modelColor } from "@/lib/constants/model-colors";
 import type { Post, ModelBreakdownEntry } from "@/types";
 import dynamic from "next/dynamic";
 import { useState } from "react";
@@ -158,23 +155,6 @@ function buildModelUsageSegments(
     pct: entry.pct,
     widthPct: (entry.cost / visibleTotal) * 100,
   }));
-}
-
-function hashString(input: string): number {
-  let hash = 0;
-  for (let i = 0; i < input.length; i++) {
-    hash = ((hash << 5) - hash) + input.charCodeAt(i);
-    hash |= 0;
-  }
-  return Math.abs(hash);
-}
-
-function modelColor(name: string): string {
-  for (const [pattern, color] of MODEL_COLOR_PATTERNS) {
-    if (pattern.test(name)) return color;
-  }
-
-  return MODEL_COLOR_FALLBACK_PALETTE[hashString(name) % MODEL_COLOR_FALLBACK_PALETTE.length]!;
 }
 
 function ModelUsageBar({ segments }: { segments: ModelUsageSegment[] }) {
