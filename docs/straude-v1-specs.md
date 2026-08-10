@@ -1,7 +1,7 @@
 # Straude v1 — Product Requirements Document
 
 **Version:** 1.0  
-**Date:** January 28, 2026  
+**Date:** 16 Feb 2026
 **Author:** @ohong
 **Status:** Draft
 

@@ -49,7 +49,9 @@ async function getFeed() {
     .single();
 
   if (!currentUserData) {
-    redirect('/onboarding');
+    // Middleware already gates onboarding — if we're here but the user row
+    // is missing, it's a data issue (webhook race, RLS), not an onboarding issue.
+    return { posts: [], nextCursor: null, postCount: 0, currentUserId: null };
   }
 
   const currentUserId = (currentUserData as { id: string }).id;

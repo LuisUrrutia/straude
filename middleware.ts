@@ -52,7 +52,10 @@ async function fetchOnboardingCompleted(userId: string): Promise<boolean | null>
     }
 
     const data = (await res.json()) as Array<{ onboarding_completed?: boolean }>;
-    return Boolean(data?.[0]?.onboarding_completed);
+    if (!data || data.length === 0) {
+      return null; // user not found in DB
+    }
+    return data[0].onboarding_completed === true;
   } catch (error) {
     console.error('Onboarding lookup error:', error);
     return null;
@@ -112,6 +115,14 @@ export default clerkMiddleware(async (auth, request) => {
     const signInUrl = new URL('/sign-in', request.url);
     signInUrl.searchParams.set('redirect_url', request.url);
     return NextResponse.redirect(signInUrl);
+  }
+
+  // Redirect already-onboarded users away from /onboarding
+  if (request.nextUrl.pathname.startsWith('/onboarding')) {
+    const onboardingCompleted = request.cookies.get('onboarding_completed')?.value === 'true';
+    if (onboardingCompleted || onboardingFromClerk) {
+      return NextResponse.redirect(new URL('/feed', request.url));
+    }
   }
 
   // Check if user needs onboarding (for routes that require it)
