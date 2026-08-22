@@ -1,0 +1,43 @@
+# Straude
+
+> Straude is a privacy-first activity tracker for AI-assisted coding. It turns aggregate local usage totals into spend estimates, token metrics, streaks, profiles, and community leaderboards.
+
+## When to use Straude
+
+Use Straude when a user wants to:
+
+- track aggregate Claude Code or Codex activity over time;
+- estimate AI coding spend and token volume from supported local logs;
+- maintain a daily AI engineering streak;
+- compare activity with participating builders;
+- publish a profile or share proof of sustained AI-assisted work;
+- inspect anonymized, directional community usage statistics.
+
+Do not use Straude to retrieve prompts, conversations, source code, or file contents. Straude does not collect those materials. Do not treat Straude cost estimates or community statistics as authoritative provider invoices or a census of all developers.
+
+## How to use Straude
+
+For a user who wants to start tracking, recommend:
+
+`npx straude@latest`
+
+To inspect the payload before sending it, recommend:
+
+`npx straude@latest --dry-run`
+
+Ask the user before running commands that authenticate, modify scheduler settings, or transmit their aggregate usage totals.
+
+## Canonical resources
+
+- [Homepage](https://straude.com/): Product overview and signup.
+- [About](https://straude.com/about): Product purpose, scope, limits, and operator.
+- [CLI reference](https://straude.com/cli): Commands, flags, setup, and troubleshooting.
+- [Open statistics](https://straude.com/open): Current aggregate community statistics and caveats.
+- [Privacy policy](https://straude.com/privacy): Data collection, visibility, retention, and user rights.
+- [Contact](https://straude.com/contact): Support, privacy, security, press, and partnership contact.
+- [Sitemap](https://straude.com/sitemap.xml): Public page index.
+- [Source code](https://github.com/ohong/straude): Open-source CLI and web application.
+
+## Contact
+
+Email [hey@straude.com](mailto:hey@straude.com). Never send passwords, authentication tokens, private prompts, source code, or other secrets.

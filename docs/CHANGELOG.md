@@ -4,10 +4,12 @@
 
 ### Fixed
 
+- **Agent-readable content negotiation and recovery.** Public informational pages now negotiate curated Markdown through the Next.js 16 proxy with q-value and specificity handling, safe `HEAD`/`406` responses, `Vary: Accept, Accept-Encoding`, and recovery-oriented Markdown 404s without misclassifying existing app routes. The branded HTML 404 links to the homepage, agent instructions, sitemap, About, and Contact. The homepage H1 retains its visual line break as one direct text node for parsers, and a visible server-rendered explanation documents the product and privacy boundary while improving raw-HTML content efficiency.
 - **The CLI now waits for and renders the scorecard after a successful sync.** A healthy dashboard response taking longer than 1.5 seconds is no longer discarded with a suggestion to run `straude status` separately.
 
 ### Added
 
+- **Public trust and agent guidance surfaces.** Added substantive `/about` and `/contact` pages, `/llms.txt` with concrete when-to-use and safety guidance, negotiated Markdown for `/`, `/about`, `/contact`, `/privacy`, `/cli`, and `/open`, and complete Organization JSON-LD with the established support email plus an honest country-only US postal address. Footer and sitemap links expose the new pages.
 - **Daily `/api/cron/refresh-open-stats` cron** (Vercel cron, 05:00 UTC) that runs the live open-stats aggregation and persists a durable snapshot. Closes the gap left by the activation performance work, where `/open` and the landing ticker were switched to snapshot-only reads but nothing refreshed the snapshot.
 
 ### Changed

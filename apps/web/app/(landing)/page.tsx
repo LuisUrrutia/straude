@@ -3,6 +3,7 @@ import { Navbar } from "@/components/landing/Navbar";
 import { Hero } from "@/components/landing/Hero";
 import { Ticker } from "@/components/landing/Ticker";
 import { FeaturesGrid } from "@/components/landing/FeaturesGrid";
+import { ProductExplanation } from "@/components/landing/ProductExplanation";
 import { PrometheusPreview } from "@/components/landing/PrometheusPreview";
 import { PrivacyPledge } from "@/components/landing/PrivacyPledge";
 import { WallOfLove } from "@/components/landing/WallOfLove";
@@ -104,6 +105,7 @@ export default function LandingPage() {
               <TickerWithData />
             </Suspense>
             <FeaturesGrid />
+            <ProductExplanation />
             <PrometheusPreview />
             <WallOfLove posts={wallOfLovePosts} />
             <PrivacyPledge />
