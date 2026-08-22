@@ -24,7 +24,7 @@ export function Footer({ hideLogo = false }: { hideLogo?: boolean }) {
 
       {/* Links + copyright */}
       <div className="font-[family-name:var(--font-mono)] text-xs text-landing-muted flex flex-col gap-1 md:text-right">
-        <div className="flex gap-4 md:justify-end">
+        <div className="flex flex-wrap gap-x-4 gap-y-1 md:justify-end">
           <Link
             href="/privacy"
             className="hover:text-landing-text transition-colors"
@@ -42,6 +42,18 @@ export function Footer({ hideLogo = false }: { hideLogo?: boolean }) {
             className="hover:text-landing-text transition-colors"
           >
             Open Stats
+          </Link>
+          <Link
+            href="/about"
+            className="hover:text-landing-text transition-colors"
+          >
+            About
+          </Link>
+          <Link
+            href="/contact"
+            className="hover:text-landing-text transition-colors"
+          >
+            Contact
           </Link>
           <a
             href="https://github.com/ohong/straude"

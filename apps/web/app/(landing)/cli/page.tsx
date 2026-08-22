@@ -205,7 +205,7 @@ export default function CliReferencePage() {
                 />
                 <Flag
                   name="--dry-run"
-                  description="Preview what would be pushed without sending anything to the server."
+                  description="Collect usage without submitting it."
                 />
                 <Flag
                   name="--timeout N"
@@ -434,7 +434,7 @@ straude --auto hooks
 # Push last 3 days
 straude --days 3
 
-# Preview without posting
+# Collect usage without submitting it
 straude --dry-run
 
 # Push a specific date

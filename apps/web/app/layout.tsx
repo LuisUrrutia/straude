@@ -3,6 +3,11 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import { Agentation } from "agentation";
 import Script from "next/script";
 import { getThemeBootstrapScript } from "@/lib/theme";
+import {
+  organizationJsonLd,
+  serializeJsonLd,
+  websiteJsonLd,
+} from "@/lib/structured-data";
 import "./globals.css";
 
 const inter = Inter({
@@ -83,29 +88,13 @@ export default function RootLayout({
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "WebSite",
-              name: "Straude",
-              url: "https://straude.com",
-              description:
-                "Strava for Claude Code. Track your AI-assisted coding sessions, share your wins, and compete on the leaderboard.",
-            }),
+            __html: serializeJsonLd(websiteJsonLd),
           }}
         />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "Organization",
-              name: "Straude",
-              url: "https://straude.com",
-              logo: "https://straude.com/icon.svg",
-              description:
-                "Strava for Claude Code. Track your AI-assisted coding sessions, share your wins, and compete on the leaderboard.",
-              sameAs: ["https://github.com/ohong/straude"],
-            }),
+            __html: serializeJsonLd(organizationJsonLd),
           }}
         />
       </head>
