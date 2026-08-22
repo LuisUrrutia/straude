@@ -84,11 +84,12 @@ export default function ContactPage() {
                 Before you write
               </h2>
               <p className="mt-3">
-                The CLI reference covers installation, login, syncing, dry runs,
-                automatic pushes, and troubleshooting. The privacy policy
-                explains the data Straude can and cannot access. Agents can also
-                consult the machine-readable instructions and sitemap before
-                asking for navigation help.
+                The CLI reference covers installation, login, syncing, how to
+                collect usage without submitting it, automatic pushes, and
+                troubleshooting. The privacy policy explains the data Straude
+                can and cannot access. Agents can also consult the
+                machine-readable instructions and sitemap before asking for
+                navigation help.
               </p>
               <nav aria-label="Support resources" className="mt-4 flex flex-wrap gap-4 font-mono text-sm">
                 <Link className="text-accent underline underline-offset-2 hover:no-underline" href="/cli">

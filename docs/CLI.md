@@ -54,7 +54,7 @@ Push usage data to Straude. Same as running `straude` with no command.
 straude push                  # Smart sync (same as bare `straude`)
 straude push --days 3         # Push last 3 days
 straude push --date 2026-03-08  # Push a specific date
-straude push --dry-run        # Preview without posting
+straude push --dry-run        # Collect usage without submitting it
 ```
 
 **Options:**
@@ -63,7 +63,7 @@ straude push --dry-run        # Preview without posting
 |------|-------------|
 | `--date YYYY-MM-DD` | Push a specific date (must be within last 30 days) |
 | `--days N` | Push last N days (max 30) |
-| `--dry-run` | Preview what would be submitted without actually posting |
+| `--dry-run` | Collect usage without submitting it |
 
 **Date range logic:**
 

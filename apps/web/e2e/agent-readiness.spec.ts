@@ -2,6 +2,15 @@ import { expect, test } from "@playwright/test";
 
 const missingPath = "/agent-readiness-path-that-does-not-exist";
 
+function visibleText(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 test.describe("agent-readable HTTP contracts", () => {
   test("negotiates HTML and Markdown on the canonical homepage", async ({ request }) => {
     const html = await request.get("/", { headers: { Accept: "text/html" } });
@@ -74,31 +83,59 @@ test.describe("agent-readable HTTP contracts", () => {
     expect(homepageHtml).toMatch(
       /<h1[^>]*>Code like\nan athlete\.<\/h1>/,
     );
+    expect(visibleText(homepageHtml)).toMatch(
+      /collect(?:s)? usage without submitting it/i,
+    );
 
-    for (const path of ["/about", "/contact"]) {
+    for (const path of ["/about", "/contact", "/privacy", "/cli"]) {
       const response = await request.get(path, { headers: { Accept: "text/html" } });
       const html = await response.text();
-      const visibleText = html
-        .replace(/<script[\s\S]*?<\/script>/gi, " ")
-        .replace(/<style[\s\S]*?<\/style>/gi, " ")
-        .replace(/<[^>]+>/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
+      const pageText = visibleText(html);
 
       expect(response.status()).toBe(200);
       expect(html).toMatch(/<h1[ >]/);
-      expect(visibleText.length).toBeGreaterThan(500);
+      expect(pageText.length).toBeGreaterThan(500);
+      expect(pageText).toMatch(
+        /collect(?:s)? usage without submitting it/i,
+      );
+      expect(pageText).not.toMatch(
+        /(?:exact|outgoing|preview(?: the)?|inspect(?: the)?) payload/i,
+      );
+      if (path === "/about" || path === "/contact") {
+        expect(pageText).toContain(
+          "Pacific Systems, Inc. d/b/a Straude",
+        );
+      }
     }
   });
 
-  test("publishes agent instructions and complete organization schema", async ({ request }) => {
+  test("publishes conformant agent instructions and honest organization schema", async ({ request }) => {
     const instructions = await request.get("/llms.txt");
     const homepage = await request.get("/");
     const html = await homepage.text();
+    const instructionsText = await instructions.text();
 
     expect(instructions.status()).toBe(200);
-    expect(await instructions.text()).toContain("## When to use Straude");
+    expect(instructionsText).toContain("Use Straude when a user wants to");
+    expect(instructionsText).toContain(
+      "collect usage without submitting it",
+    );
+    expect(instructionsText).not.toMatch(
+      /(?:exact|outgoing|preview(?: the)?|inspect(?: the)?) payload/i,
+    );
+    const sections = instructionsText.split(/\n(?=## )/).slice(1);
+    expect(sections.length).toBeGreaterThan(0);
+    for (const section of sections) {
+      const resourceLines = section.split("\n").slice(1).filter(Boolean);
+      expect(resourceLines.length).toBeGreaterThan(0);
+      expect(
+        resourceLines.every((line) =>
+          /^- \[[^\]]+\]\([^)]+\): .+/.test(line),
+        ),
+      ).toBe(true);
+    }
     expect(html).toContain('"contactType":"customer support"');
     expect(html).toContain('"addressCountry":"US"');
+    expect(html).toContain('"legalName":"Pacific Systems, Inc."');
   });
 });

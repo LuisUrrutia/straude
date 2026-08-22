@@ -51,6 +51,16 @@ describe("proxy content negotiation", () => {
     expect(updateSessionMock).toHaveBeenCalledOnce();
   });
 
+  it("bypasses negotiation for Markdown-preferring OAuth callbacks", async () => {
+    const response = await proxy(
+      request("/callback?code=oauth-code", "text/markdown, text/html;q=0.1"),
+    );
+
+    expect(updateSessionMock).toHaveBeenCalledOnce();
+    expect(response.headers.get("x-middleware-rewrite")).toBeNull();
+    expect(response.status).not.toBe(406);
+  });
+
   it("returns 406 when a known page cannot satisfy Accept", async () => {
     const response = await proxy(request("/feed", "text/markdown"));
 
@@ -68,6 +78,17 @@ describe("proxy content negotiation", () => {
     );
     expect(body).toContain("https://straude.com/sitemap.xml");
     expect(body).toContain("https://straude.com/llms.txt");
+  });
+
+  it("keeps unsupported media on unknown routes as 406", async () => {
+    const response = await proxy(
+      request("/definitely-missing", "application/pdf"),
+    );
+
+    expect(response.status).toBe(406);
+    expect(response.headers.get("Content-Type")).toBe(
+      "text/plain; charset=utf-8",
+    );
   });
 
   it.each([

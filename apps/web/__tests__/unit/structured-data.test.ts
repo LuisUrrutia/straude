@@ -12,6 +12,7 @@ describe("organization structured data", () => {
       "@type": "PostalAddress",
       addressCountry: "US",
     });
+    expect(organizationJsonLd.legalName).toBe("Pacific Systems, Inc.");
     expect(organizationJsonLd).not.toHaveProperty("telephone");
     expect(organizationJsonLd.address).not.toHaveProperty("streetAddress");
   });

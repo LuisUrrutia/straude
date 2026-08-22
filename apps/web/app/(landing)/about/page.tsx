@@ -51,10 +51,10 @@ export default function AboutPage() {
                 your prompts, conversations, source code, or file contents. The
                 open-source CLI reads supported local usage logs, aggregates
                 them into daily totals, and sends only those totals when you
-                choose to sync. You can run a dry run first to inspect the exact
-                payload. That architecture lets Straude provide accountability
-                and community without becoming a code-analysis or
-                employee-monitoring system.
+                choose to sync. You can run a dry run first to collect usage
+                without submitting it. That architecture lets Straude provide
+                accountability and community without becoming a code-analysis
+                or employee-monitoring system.
               </p>
             </section>
 

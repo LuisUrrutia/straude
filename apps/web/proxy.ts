@@ -67,6 +67,7 @@ function isDocumentRequest(request: NextRequest): boolean {
 
   const pathname = request.nextUrl.pathname;
   if (
+    normalizedPathname(pathname) === "/callback" ||
     pathname.startsWith("/api/") ||
     pathname.startsWith("/_next/") ||
     pathname.startsWith("/ingest/") ||

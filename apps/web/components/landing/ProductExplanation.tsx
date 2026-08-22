@@ -28,10 +28,10 @@ export function ProductExplanation() {
           </h3>
           <p className="mt-3 text-pretty text-sm leading-relaxed text-landing-muted">
             The open-source CLI reads supported Claude Code and Codex usage logs
-            on your machine and groups activity into daily totals. Before a sync,
-            you can run a dry run to inspect the payload. Straude is designed to
-            measure the shape of your practice without needing the substance of
-            the work that produced it.
+            on your machine and groups activity into daily totals. Before a
+            sync, you can run a dry run to collect usage without submitting it.
+            Straude is designed to measure the shape of your practice without
+            needing the substance of the work that produced it.
           </p>
           <p className="mt-3 text-pretty text-sm leading-relaxed text-landing-muted">
             That makes setup intentionally small: one command after a session,

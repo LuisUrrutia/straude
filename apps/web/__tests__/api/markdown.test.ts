@@ -22,6 +22,31 @@ describe("GET /api/markdown", () => {
       expect(response.headers.get("Vary")).toBe("Accept, Accept-Encoding");
       expect(body).toMatch(/^# /);
       expect(body.length).toBeGreaterThan(500);
+      expect(body).not.toMatch(
+        /(?:exact|outgoing|preview(?: the)?|inspect(?: the)?) payload/i,
+      );
+    },
+  );
+
+  it.each(["/about", "/contact"])(
+    "publishes the established operator on %s",
+    async (path) => {
+      const body = await GET(request(path)).text();
+
+      expect(body).toContain(
+        "Pacific Systems, Inc. d/b/a Straude",
+      );
+    },
+  );
+
+  it.each(["/", "/about", "/privacy", "/cli"])(
+    "describes dry-run semantics accurately for %s",
+    async (path) => {
+      const body = await GET(request(path)).text();
+
+      expect(body).toContain(
+        "collect usage without submitting it",
+      );
     },
   );
 
