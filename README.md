@@ -20,7 +20,7 @@ npx straude@latest
 
 The CLI reads your local [ccusage](https://github.com/ccusage/ccusage) data (cost, tokens, models, sessions), uploads it to Straude, and auto-creates a post on your feed. That includes every source ccusage detects, currently Claude Code, Codex, OpenCode, Amp, Droid, Codebuff, Hermes Agent, pi-agent, Goose, OpenClaw, Kilo, Kimi, Qwen, GitHub Copilot CLI, and Gemini CLI. First run opens a browser login; after that, just run `npx straude@latest` daily. It automatically pushes new stats since your last sync.
 
-Options: `--date YYYY-MM-DD` to push a specific date, `--days N` to backfill the last N days (max 7), `--dry-run` to preview without posting. Run `npx straude@latest status` to check your streak and rank.
+Options: `--date YYYY-MM-DD` to push a specific date, `--days N` to backfill the last N days (max 7), `--dry-run` to collect usage without submitting it. Run `npx straude@latest status` to check your streak and rank.
 
 ## Features
 
@@ -91,7 +91,7 @@ The CLI runs [ccusage](https://github.com/ccusage/ccusage) locally on your machi
 
 ### Can Straude see my code or prompts?
 
-No. The data pipeline is: local JSONL logs → ccusage (local aggregation) → daily totals sent to Straude. At no point does any conversation content, prompt text, code, or file path leave your machine. You can verify this yourself — the CLI is open source, and you can run `npx straude --dry-run` to see exactly what would be sent before it's sent.
+No. The data pipeline is: local JSONL logs → ccusage (local aggregation) → daily totals sent to Straude. At no point does any conversation content, prompt text, code, or file path leave your machine. You can verify the implementation yourself because the CLI is open source. Run `npx straude --dry-run` to collect usage without submitting it.
 
 ### Is my profile public by default?
 
