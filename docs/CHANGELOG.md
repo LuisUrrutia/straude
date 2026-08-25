@@ -6,17 +6,20 @@
 
 - **Model chips no longer render colourless for unknown models.** The fallback palette was indexed with a signed 32-bit hash, so any model name that hashed negative indexed off the front of the array and handed the chip an `undefined` background — about half of all names, hidden from TypeScript by a non-null assertion. Now that collection accepts every ccusage source, real names like `kimi-k2` and `deepseek-v3` hit this. The hash is folded to a positive index and the mapping is covered by unit tests.
 
+- **Agent-readable content negotiation and recovery.** Public informational pages now negotiate curated Markdown through the Next.js 16 proxy with q-value and specificity handling, safe `HEAD`/`406` responses, `Vary: Accept, Accept-Encoding`, and recovery-oriented Markdown 404s without misclassifying existing app routes. OAuth callbacks bypass document negotiation so authentication is never intercepted. The branded HTML 404 links to the homepage, agent instructions, sitemap, About, and Contact. The homepage H1 retains its visual line break as one direct text node for parsers, and a visible server-rendered explanation documents the product and privacy boundary while improving raw-HTML content efficiency.
+
 - **The CLI now waits for and renders the scorecard after a successful sync.** A healthy dashboard response taking longer than 1.5 seconds is no longer discarded with a suggestion to run `straude status` separately.
 
 ### Added
 
+- **Public trust and agent guidance surfaces.** Added substantive `/about` and `/contact` pages, proposal-conformant `/llms.txt` with concrete when-to-use and safety guidance, negotiated Markdown for `/`, `/about`, `/contact`, `/privacy`, `/cli`, and `/open`, and complete Organization JSON-LD with the established Pacific Systems legal name, support email, and country-only US postal address. Dry-run guidance consistently describes collection without submission. Footer and sitemap links expose the new pages.
 - **Daily `/api/cron/refresh-open-stats` cron** (Vercel cron, 05:00 UTC) that runs the live open-stats aggregation and persists a durable snapshot. Closes the gap left by the activation performance work, where `/open` and the landing ticker were switched to snapshot-only reads but nothing refreshed the snapshot.
 
 ### Changed
 
 - **Extracted `ActivityCard`'s hardcoded model chip colors** into `apps/web/lib/constants/model-colors.ts`, which now owns the whole name-to-colour decision (`modelColor`) rather than exporting raw tables for callers to recombine. Same colors, same matching order, per the design-system-consistency roadmap item.
 
-- **All ccusage sources and the OpenAI GPT-5.6 family are now tracked.** The CLI dependency floor is `ccusage@20.0.16`, the first release with `gpt-5.6`, `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna` plus request-level long-context pricing. Collection now uses current online LiteLLM pricing by default, avoiding stale embedded-price estimates. Unified rows are no longer filtered to Claude/Codex: Straude accepts every source ID emitted by ccusage, carries each row's source IDs through submission metadata, and retains source-aware handling for trusted Codex corrections. A real bundled-binary fixture locks the four GPT-5.6 variants to 440,000 total tokens and $1.917 in API-equivalent spend at the current LiteLLM rates.
+- **All ccusage sources and the OpenAI GPT-5.6 family are now tracked.** The CLI dependency floor is `ccusage@20.0.16`, the first release with `gpt-5.6`, `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna` plus request-level long-context pricing. Collection now uses current online LiteLLM pricing by default, avoiding stale embedded-price estimates. Unified rows are no longer filtered to Claude/Codex: Straude accepts every source ID emitted by ccusage, carries each row's source IDs through submission metadata, and retains source-aware handling for trusted Codex corrections. A real bundled-binary fixture locks the four GPT-5.6 variants to 440,000 total tokens and asserts that every variant resolves to a non-zero LiteLLM price, with the day total equal to the sum of the per-model breakdown. The dollar amounts themselves are owned upstream and move without notice, so they are deliberately not pinned.
 
 - **Activation funnel events are now captured exclusively server-side.** `trackActivationEvent` no longer double-captures via browser posthog-js for consented users; the consent-exempt, privacy-limited server path (which owns anonymous→user identity stitching) is the single source of truth for funnel math.
 
@@ -343,7 +346,6 @@
 - **Interaction animation durations.** Changed hover transition durations from `duration-300` to `duration-200` on `WallOfLove` cards and `FeaturesGrid` feature cards per baseline-ui guidelines.
 - **Missing `aria-label` on PostEditor close button.** Added `aria-label="Close editor"` to the icon-only close button.
 - **MentionInput missing accessible label.** Added `aria-label` derived from placeholder text to the underlying input/textarea element.
-
 
 - **Multi-device usage support.** Users who code on multiple machines now get their stats summed instead of overwritten. New `device_usage` table stores per-device rows; `daily_usage` is recalculated as the aggregate. CLI auto-generates a `device_id` (UUID v4) on first push, stored in `~/.straude/config.json`. Old CLIs without `device_id` continue to work via the legacy upsert path. UI is unchanged — viewers see summed totals only.
 - **CLI token normalization engine.** Added source-agnostic normalization for ccusage/codex JSON so persisted `inputTokens`/`outputTokens` match table semantics, with anomaly/confidence metadata and deterministic output adjustment safeguards.

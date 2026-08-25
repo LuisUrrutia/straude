@@ -16,10 +16,8 @@ export function Hero() {
           {"// STRAVA FOR CLAUDE CODE"}
         </p>
 
-        <h1 className="text-[clamp(3rem,8vw,7rem)] font-medium tracking-[-0.03em] leading-[1.1] text-landing-text text-balance mb-8">
-          Code like
-          <br />
-          an athlete.
+        <h1 className="whitespace-pre-line text-[clamp(3rem,8vw,7rem)] font-medium tracking-[-0.03em] leading-[1.1] text-landing-text text-balance mb-8">
+          {"Code like\nan athlete."}
         </h1>
 
         <p className="font-[family-name:var(--font-mono)] text-base text-landing-muted max-w-[500px]">
