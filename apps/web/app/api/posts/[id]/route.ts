@@ -277,7 +277,7 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { error } = await supabase
+  const { error } = await getServiceClient()
     .from("posts")
     .delete()
     .eq("id", id)

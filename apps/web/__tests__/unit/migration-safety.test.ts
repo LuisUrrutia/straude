@@ -23,6 +23,32 @@ function getLatestMigrationMatching(
   return migrations.filter((m) => pattern.test(m.content)).at(-1);
 }
 
+function hasAuthenticatedUsersUpdateGrant(
+  migrations: { name: string; content: string }[],
+): boolean {
+  let updateGranted = false;
+  const privilegeStatement = /\b(GRANT|REVOKE)\s+([\s\S]*?)\s+ON\s+public\.users\s+(?:TO|FROM)\s+([^;]+);/gi;
+
+  for (const migration of migrations) {
+    const sql = migration.content.replace(/^\s*--.*$/gm, "");
+    for (const match of sql.matchAll(privilegeStatement)) {
+      const [, action, privileges, roles] = match;
+      if (!/\bauthenticated\b/i.test(roles ?? "")) continue;
+
+      const grantsUpdate = /\bALL(?:\s+PRIVILEGES)?\b|\bUPDATE\b/i.test(privileges ?? "");
+      if (!grantsUpdate) continue;
+
+      if (action?.toUpperCase() === "GRANT") {
+        updateGranted = true;
+      } else if (/\bALL(?:\s+PRIVILEGES)?\b|\bUPDATE\b(?!\s*\()/i.test(privileges ?? "")) {
+        updateGranted = false;
+      }
+    }
+  }
+
+  return updateGranted;
+}
+
 describe("Migration safety", () => {
   const migrations = getAllMigrations();
 
@@ -192,6 +218,8 @@ describe("Migration safety", () => {
     expect(latest, "Expected an API write-privilege hardening migration").toBeTruthy();
     const content = latest!.content;
 
+    expect(hasAuthenticatedUsersUpdateGrant(migrations)).toBe(false);
+
     expect(content).toMatch(
       /REVOKE\s+INSERT,\s*UPDATE\s+ON\s+public\.daily_usage\s+FROM\s+authenticated/i,
     );
@@ -199,7 +227,7 @@ describe("Migration safety", () => {
       /REVOKE\s+INSERT,\s*UPDATE\s+ON\s+public\.device_usage\s+FROM\s+authenticated/i,
     );
     expect(content).toMatch(
-      /REVOKE\s+INSERT,\s*UPDATE\s+ON\s+public\.posts\s+FROM\s+authenticated/i,
+      /REVOKE\s+INSERT,\s*UPDATE,\s*DELETE\s+ON\s+public\.posts\s+FROM\s+authenticated/i,
     );
     expect(content).not.toMatch(
       /GRANT\s+UPDATE\s*\([^)]*\)\s+ON\s+public\.posts\s+TO\s+authenticated/i,

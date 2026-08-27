@@ -27,7 +27,7 @@ GRANT SELECT (
   updated_at
 ) ON public.daily_usage TO anon, authenticated;
 
-REVOKE INSERT, UPDATE ON public.posts FROM authenticated;
+REVOKE INSERT, UPDATE, DELETE ON public.posts FROM authenticated;
 
 REVOKE INSERT, DELETE ON public.follows FROM authenticated;
 REVOKE INSERT, DELETE ON public.kudos FROM authenticated;

@@ -542,12 +542,14 @@ describe("DELETE /api/posts/[id]", () => {
       }),
     };
     (createClient as any).mockResolvedValue(client);
+    currentAuthClient = client;
 
     const res = await DELETE(makeRequest("DELETE"), makeContext("post-1"));
     const json = await res.json();
 
     expect(res.status).toBe(200);
     expect(json.success).toBe(true);
+    expect(mockServiceFrom).toHaveBeenCalledWith("posts");
   });
 
   it("rejects unauthenticated DELETE", async () => {
@@ -594,6 +596,7 @@ describe("DELETE /api/posts/[id]", () => {
       }),
     };
     (createClient as any).mockResolvedValue(client);
+    currentAuthClient = client;
 
     const res = await DELETE(makeRequest("DELETE"), makeContext("post-1"));
     const json = await res.json();
