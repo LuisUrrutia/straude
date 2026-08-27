@@ -27,6 +27,12 @@ export async function GET(request: NextRequest) {
   }
 
   const normalizedQuery = q.normalize("NFKC").trim();
+  if (normalizedQuery.includes("*")) {
+    return NextResponse.json(
+      { error: "Query contains unsupported characters" },
+      { status: 400 },
+    );
+  }
   const searchableCharacters = normalizedQuery.match(/[\p{L}\p{N}_-]/gu)?.length ?? 0;
   if (searchableCharacters < 2) {
     return NextResponse.json(

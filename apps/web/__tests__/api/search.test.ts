@@ -65,6 +65,15 @@ describe("GET /api/search", () => {
     expect(supabaseChain.or).not.toHaveBeenCalled();
   });
 
+  it("rejects asterisks instead of passing PostgREST wildcard aliases", async () => {
+    const { supabaseChain } = mockClients();
+
+    const res = await GET(makeRequest({ q: "ab*" }));
+
+    expect(res.status).toBe(400);
+    expect(supabaseChain.or).not.toHaveBeenCalled();
+  });
+
   it("preserves underscores in valid usernames as literal search characters", async () => {
     const { supabaseChain } = mockClients({
       users: [{ id: "u-1", username: "alice_dev" }],
