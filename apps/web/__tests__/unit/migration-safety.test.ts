@@ -26,7 +26,8 @@ function getLatestMigrationMatching(
 function hasAuthenticatedUsersUpdateGrant(
   migrations: { name: string; content: string }[],
 ): boolean {
-  let updateGranted = false;
+  let tableUpdateGranted = false;
+  const columnUpdateGrants = new Set<string>();
   const privilegeStatement = /\b(GRANT|REVOKE)\s+([\s\S]*?)\s+ON\s+public\.users\s+(?:TO|FROM)\s+([^;]+);/gi;
 
   for (const migration of migrations) {
@@ -35,18 +36,36 @@ function hasAuthenticatedUsersUpdateGrant(
       const [, action, privileges, roles] = match;
       if (!/\bauthenticated\b/i.test(roles ?? "")) continue;
 
-      const grantsUpdate = /\bALL(?:\s+PRIVILEGES)?\b|\bUPDATE\b/i.test(privileges ?? "");
-      if (!grantsUpdate) continue;
+      const privilegeList = privileges ?? "";
+      const columnUpdateMatches = privilegeList.matchAll(
+        /\b(?:UPDATE|ALL(?:\s+PRIVILEGES)?)\s*\(([^)]*)\)/gi,
+      );
+      const columns = Array.from(columnUpdateMatches).flatMap((columnMatch) =>
+        (columnMatch[1] ?? "")
+          .split(",")
+          .map((column) => column.trim().toLowerCase())
+          .filter(Boolean),
+      );
+      const tablePrivileges = privilegeList.replace(
+        /\b(?:UPDATE|ALL(?:\s+PRIVILEGES)?)\s*\([^)]*\)/gi,
+        "",
+      );
+      const appliesTableWide = /\bALL(?:\s+PRIVILEGES)?\b|\bUPDATE\b/i.test(
+        tablePrivileges,
+      );
+      if (!appliesTableWide && columns.length === 0) continue;
 
       if (action?.toUpperCase() === "GRANT") {
-        updateGranted = true;
-      } else if (/\bALL(?:\s+PRIVILEGES)?\b|\bUPDATE\b(?!\s*\()/i.test(privileges ?? "")) {
-        updateGranted = false;
+        if (appliesTableWide) tableUpdateGranted = true;
+        for (const column of columns) columnUpdateGrants.add(column);
+      } else {
+        if (appliesTableWide) tableUpdateGranted = false;
+        for (const column of columns) columnUpdateGrants.delete(column);
       }
     }
   }
 
-  return updateGranted;
+  return tableUpdateGranted || columnUpdateGrants.size > 0;
 }
 
 describe("Migration safety", () => {
@@ -54,6 +73,25 @@ describe("Migration safety", () => {
 
   it("finds migration files", () => {
     expect(migrations.length).toBeGreaterThan(0);
+  });
+
+  it("tracks column-level users update grants and revokes", () => {
+    const columnGrant = {
+      name: "001_grant.sql",
+      content: "GRANT UPDATE (bio) ON public.users TO authenticated;",
+    };
+    const columnRevoke = {
+      name: "002_revoke.sql",
+      content: "REVOKE UPDATE (bio) ON public.users FROM authenticated;",
+    };
+    const tableGrant = {
+      name: "001_table_grant.sql",
+      content: "GRANT UPDATE ON public.users TO authenticated;",
+    };
+
+    expect(hasAuthenticatedUsersUpdateGrant([columnGrant])).toBe(true);
+    expect(hasAuthenticatedUsersUpdateGrant([columnGrant, columnRevoke])).toBe(false);
+    expect(hasAuthenticatedUsersUpdateGrant([tableGrant, columnRevoke])).toBe(true);
   });
 
   it("handle_new_user() must always insert into public.users", () => {
