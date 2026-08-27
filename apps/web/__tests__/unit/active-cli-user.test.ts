@@ -8,7 +8,10 @@ vi.mock("@/lib/supabase/service", () => ({
   })),
 }));
 
-import { isActiveCliUser } from "@/lib/api/active-cli-user";
+import {
+  CliIdentityUnavailableError,
+  isActiveCliUser,
+} from "@/lib/api/active-cli-user";
 
 describe("isActiveCliUser", () => {
   beforeEach(() => {
@@ -27,7 +30,7 @@ describe("isActiveCliUser", () => {
   it("rejects a deleted user", async () => {
     getUserById.mockResolvedValue({
       data: { user: null },
-      error: { message: "User not found" },
+      error: { message: "User not found", code: "user_not_found" },
     });
 
     expect(await isActiveCliUser("deleted-user")).toBe(false);
@@ -49,5 +52,24 @@ describe("isActiveCliUser", () => {
     });
 
     expect(await isActiveCliUser("user-1")).toBe(false);
+  });
+
+  it("distinguishes a transient identity provider error from an inactive user", async () => {
+    getUserById.mockResolvedValue({
+      data: { user: null },
+      error: { message: "Request timed out", code: "request_timeout" },
+    });
+
+    await expect(isActiveCliUser("user-1")).rejects.toBeInstanceOf(
+      CliIdentityUnavailableError,
+    );
+  });
+
+  it("surfaces identity provider connection failures", async () => {
+    getUserById.mockRejectedValue(new Error("Connection refused"));
+
+    await expect(isActiveCliUser("user-1")).rejects.toBeInstanceOf(
+      CliIdentityUnavailableError,
+    );
   });
 });

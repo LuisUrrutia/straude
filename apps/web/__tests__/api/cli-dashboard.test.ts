@@ -69,6 +69,22 @@ describe("GET /api/cli/dashboard", () => {
     expect(mockServiceClient.from).not.toHaveBeenCalled();
   });
 
+  it("returns 503 when the identity provider cannot verify the user", async () => {
+    mockServiceClient.auth.admin.getUserById.mockResolvedValueOnce({
+      data: { user: null },
+      error: { message: "Request timed out", code: "request_timeout" },
+    });
+
+    const response = await GET(
+      new Request("http://localhost/api/cli/dashboard", {
+        headers: { authorization: "Bearer token" },
+      }),
+    );
+
+    expect(response.status).toBe(503);
+    expect(mockServiceClient.from).not.toHaveBeenCalled();
+  });
+
   it("aggregates model breakdown from the same last-7-days window as the scorecard", async () => {
     const profile = chain({
       single: vi.fn().mockResolvedValue({
