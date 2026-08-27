@@ -234,11 +234,13 @@ export async function PATCH(request: NextRequest) {
     if (typeof updates.timezone !== "string" || updates.timezone.length > 64) {
       return NextResponse.json({ error: "Timezone is invalid" }, { status: 400 });
     }
+    const timezone = updates.timezone || "UTC";
     try {
-      new Intl.DateTimeFormat("en-US", { timeZone: updates.timezone });
+      new Intl.DateTimeFormat("en-US", { timeZone: timezone });
     } catch {
       return NextResponse.json({ error: "Timezone is invalid" }, { status: 400 });
     }
+    updates.timezone = timezone;
   }
 
   for (const field of [

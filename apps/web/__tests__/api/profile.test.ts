@@ -614,6 +614,23 @@ describe("PATCH /api/users/me", () => {
     }
   });
 
+  it("normalizes an empty timezone without rejecting the profile update", async () => {
+    const { updateMock } = mockAuthenticatedProfileUpdate();
+
+    const res = await PATCH(
+      makeRequest("PATCH", "/api/users/me", {
+        display_name: "Alice",
+        timezone: "",
+      })
+    );
+
+    expect(res.status).toBe(200);
+    expect(updateMock).toHaveBeenCalledWith({
+      display_name: "Alice",
+      timezone: "UTC",
+    });
+  });
+
   it("validates how you heard about Straude length (max 500)", async () => {
     const client: Record<string, any> = {
       auth: {
