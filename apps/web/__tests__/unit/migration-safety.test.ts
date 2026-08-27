@@ -307,6 +307,14 @@ describe("Migration safety", () => {
       /DROP\s+FUNCTION\s+IF\s+EXISTS\s+public\.calculate_user_streak\(uuid\)/i,
     );
     expect(content).toMatch(/cardinality\(p_user_ids\)\s*>\s*100/i);
+    const batchFunction = content.match(
+      /CREATE\s+OR\s+REPLACE\s+FUNCTION\s+public\.calculate_streaks_batch[\s\S]*?\$\$;/i,
+    )?.[0];
+    expect(batchFunction).toBeTruthy();
+    expect(batchFunction).toMatch(/FOREACH\s+v_user_id\s+IN\s+ARRAY\s+p_user_ids/i);
+    expect(batchFunction).toMatch(
+      /WHEN\s+SQLSTATE\s+'42501'[\s\S]*streak\s*:=\s*0[\s\S]*RETURN\s+NEXT/i,
+    );
     expect(content).toMatch(
       /LEAST\(GREATEST\(COALESCE\(streak_freezes,\s*0\),\s*0\),\s*7\)/i,
     );

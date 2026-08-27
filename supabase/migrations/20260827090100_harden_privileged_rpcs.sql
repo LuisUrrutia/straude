@@ -141,6 +141,8 @@ LANGUAGE plpgsql
 STABLE
 SET search_path = public, pg_temp
 AS $$
+DECLARE
+  v_user_id uuid;
 BEGIN
   IF p_user_ids IS NULL THEN
     RETURN;
@@ -151,9 +153,16 @@ BEGIN
       USING ERRCODE = '22023';
   END IF;
 
-  RETURN QUERY
-  SELECT uid, public.calculate_user_streak(uid, 0)
-  FROM unnest(p_user_ids) AS uid;
+  FOREACH v_user_id IN ARRAY p_user_ids LOOP
+    user_id := v_user_id;
+    BEGIN
+      streak := public.calculate_user_streak(v_user_id, 0);
+    EXCEPTION
+      WHEN SQLSTATE '42501' THEN
+        streak := 0;
+    END;
+    RETURN NEXT;
+  END LOOP;
 END;
 $$;
 
