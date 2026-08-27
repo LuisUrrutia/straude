@@ -4,9 +4,13 @@ import { createClient } from "@/lib/supabase/server";
 // Safe public fields only — never expose email, private settings, etc.
 const PUBLIC_USER_FIELDS = "id, username, display_name, bio, avatar_url, is_public";
 
-/** Keep user-visible search text while removing PostgREST/ILIKE metacharacters. */
+/** Keep user-visible search text while neutralizing PostgREST/ILIKE metacharacters. */
 function sanitizeFilter(s: string): string {
-  return s.normalize("NFKC").replace(/[^\p{L}\p{N}\s-]/gu, "").trim();
+  return s
+    .normalize("NFKC")
+    .replace(/[^\p{L}\p{N}\s_-]/gu, "")
+    .trim()
+    .replaceAll("_", "\\_");
 }
 
 export async function GET(request: NextRequest) {

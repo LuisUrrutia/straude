@@ -59,10 +59,23 @@ describe("GET /api/search", () => {
   it("rejects wildcard-only queries instead of turning them into a full scan", async () => {
     const { supabaseChain } = mockClients();
 
-    const res = await GET(makeRequest({ q: "%%__" }));
+    const res = await GET(makeRequest({ q: "%%" }));
 
     expect(res.status).toBe(400);
     expect(supabaseChain.or).not.toHaveBeenCalled();
+  });
+
+  it("preserves underscores in valid usernames as literal search characters", async () => {
+    const { supabaseChain } = mockClients({
+      users: [{ id: "u-1", username: "alice_dev" }],
+    });
+
+    const res = await GET(makeRequest({ q: "alice_dev" }));
+
+    expect(res.status).toBe(200);
+    expect(supabaseChain.or).toHaveBeenCalledWith(
+      "username.ilike.%alice\\_dev%,display_name.ilike.%alice\\_dev%,github_username.ilike.%alice\\_dev%",
+    );
   });
 
   it("searches by username and github_username via OR filter", async () => {
