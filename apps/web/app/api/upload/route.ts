@@ -156,8 +156,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No file provided" }, { status: 400 });
   }
 
+  const maxMB = Math.round(config.maxSize / (1024 * 1024));
   if (file.size > config.maxSize) {
-    const maxMB = Math.round(config.maxSize / (1024 * 1024));
     return NextResponse.json(
       { error: `File too large. Maximum size is ${maxMB}MB` },
       { status: 400 }
@@ -176,7 +176,8 @@ export async function POST(request: NextRequest) {
   let ext: string;
 
   // Detect HEIC by magic bytes OR MIME type — iOS sometimes mislabels HEIC files
-  const isHeic = HEIC_MIME_TYPES.includes(mimeType) || isHeicByMagicBytes(buffer);
+  const hasHeicSignature = isHeicByMagicBytes(buffer);
+  const isHeic = HEIC_MIME_TYPES.includes(mimeType) || hasHeicSignature;
 
   if (!config.allowedTypes.includes(mimeType) && !isHeic) {
     return NextResponse.json(
@@ -185,8 +186,17 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const hasHeicSignature = isHeicByMagicBytes(buffer);
   if (HEIC_MIME_TYPES.includes(mimeType) && !hasHeicSignature) {
+    return NextResponse.json(
+      { error: "File content does not match the declared image type" },
+      { status: 400 },
+    );
+  }
+
+  const acceptsDetectedHeic = HEIC_MIME_TYPES.includes(mimeType)
+    || mimeType === "application/octet-stream"
+    || mimeType === "";
+  if (hasHeicSignature && !acceptsDetectedHeic) {
     return NextResponse.json(
       { error: "File content does not match the declared image type" },
       { status: 400 },
@@ -230,6 +240,13 @@ export async function POST(request: NextRequest) {
   } else {
     // Non-image file (only allowed for dm-attachments bucket)
     ext = getExtension(mimeType, file.name);
+  }
+
+  if (buffer.length > config.maxSize) {
+    return NextResponse.json(
+      { error: `File too large. Maximum size is ${maxMB}MB` },
+      { status: 400 },
+    );
   }
 
   const fileName = `${user.id}/${randomUUID()}.${ext}`;

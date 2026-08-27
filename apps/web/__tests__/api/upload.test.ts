@@ -265,6 +265,36 @@ describe("POST /api/upload", () => {
     expect(json.error).toContain("does not match");
   });
 
+  it("rejects HEIC bytes declared as another image type", async () => {
+    mockSupabase({});
+
+    const res = await POST(
+      makeUploadRequest({
+        name: "spoofed.png",
+        type: "image/png",
+        size: 12,
+        buffer: makeHeicBuffer("heic"),
+      })
+    );
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain("does not match");
+  });
+
+  it("rejects HEIC conversion output over the bucket limit", async () => {
+    mockSupabase({});
+    vi.mocked(convert).mockResolvedValueOnce(new ArrayBuffer(10 * 1024 * 1024 + 1));
+
+    const res = await POST(
+      makeUploadRequest({ name: "photo.heic", type: "image/heic", size: 12 })
+    );
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain("10MB");
+  });
+
   it("rejects HTML disguised as a PNG", async () => {
     mockSupabase({});
 
