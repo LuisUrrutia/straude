@@ -35,7 +35,7 @@ const BUCKET_CONFIG: Record<BucketId, { maxSize: number; allowedTypes: string[] 
     allowedTypes: IMAGE_TYPES,
   },
   "post-images": {
-    maxSize: 20 * 1024 * 1024,
+    maxSize: 10 * 1024 * 1024,
     allowedTypes: IMAGE_TYPES,
   },
   "dm-attachments": {

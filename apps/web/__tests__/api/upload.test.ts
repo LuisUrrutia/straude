@@ -377,16 +377,16 @@ describe("POST /api/upload", () => {
     expect(res.status).toBe(200);
   });
 
-  it("rejects files over 20MB", async () => {
+  it("rejects post images over the storage bucket's 10MB limit", async () => {
     mockSupabase({});
 
     const res = await POST(
-      makeUploadRequest({ name: "huge.jpg", type: "image/jpeg", size: 21 * 1024 * 1024 })
+      makeUploadRequest({ name: "huge.jpg", type: "image/jpeg", size: 11 * 1024 * 1024 })
     );
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toContain("20MB");
+    expect(json.error).toContain("10MB");
   });
 
   it("returns url on success", async () => {
