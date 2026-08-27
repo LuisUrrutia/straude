@@ -9,6 +9,10 @@ vi.mock("@/lib/api/cli-auth", () => ({
   verifyCliTokenWithRefresh: vi.fn(),
 }));
 
+vi.mock("@/lib/api/active-cli-user", () => ({
+  isActiveCliUser: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock("@/lib/supabase/service", () => ({
   getServiceClient: vi.fn(),
 }));

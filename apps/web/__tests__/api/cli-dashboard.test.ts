@@ -1,6 +1,14 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
 const mockServiceClient: Record<string, any> = {
+  auth: {
+    admin: {
+      getUserById: vi.fn().mockResolvedValue({
+        data: { user: { id: "user-123", banned_until: null } },
+        error: null,
+      }),
+    },
+  },
   from: vi.fn(),
   rpc: vi.fn(),
 };
@@ -43,6 +51,22 @@ describe("GET /api/cli/dashboard", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it("rejects a signed token after the user is banned", async () => {
+    mockServiceClient.auth.admin.getUserById.mockResolvedValueOnce({
+      data: { user: { id: "user-123", banned_until: "2999-01-01T00:00:00Z" } },
+      error: null,
+    });
+
+    const response = await GET(
+      new Request("http://localhost/api/cli/dashboard", {
+        headers: { authorization: "Bearer token" },
+      }),
+    );
+
+    expect(response.status).toBe(401);
+    expect(mockServiceClient.from).not.toHaveBeenCalled();
   });
 
   it("aggregates model breakdown from the same last-7-days window as the scorecard", async () => {

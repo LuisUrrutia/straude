@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { verifyCliTokenWithRefresh } from "@/lib/api/cli-auth";
+import { isActiveCliUser } from "@/lib/api/active-cli-user";
 import { getServiceClient } from "@/lib/supabase/service";
 
 export async function GET(request: Request) {
   // Auth: verify CLI JWT from Authorization header
   const authHeader = request.headers.get("authorization");
   const auth = verifyCliTokenWithRefresh(authHeader);
-  if (!auth) {
+  if (!auth || !(await isActiveCliUser(auth.userId))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userId = auth.userId;

@@ -22,6 +22,10 @@ vi.mock("@/lib/api/cli-auth", async (importOriginal) => {
   };
 });
 
+vi.mock("@/lib/api/active-cli-user", () => ({
+  isActiveCliUser: vi.fn().mockResolvedValue(true),
+}));
+
 const mockServiceClient = {
   from: vi.fn(),
   rpc: vi.fn(),

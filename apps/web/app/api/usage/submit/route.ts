@@ -3,6 +3,7 @@ import { after } from "@/lib/utils/after";
 import { captureServerActivationEvent } from "@/lib/analytics/server";
 import { createClient } from "@/lib/supabase/server";
 import { verifyCliTokenWithRefresh } from "@/lib/api/cli-auth";
+import { isActiveCliUser } from "@/lib/api/active-cli-user";
 import { getServiceClient } from "@/lib/supabase/service";
 import { checkAndAwardAchievements } from "@/lib/achievements";
 import { rateLimit } from "@/lib/rate-limit";
@@ -361,6 +362,7 @@ async function resolveAuthContext(request: Request): Promise<AuthContext | null>
   const authHeader = request.headers.get("authorization");
   const cliAuth = verifyCliTokenWithRefresh(authHeader);
   if (cliAuth) {
+    if (!(await isActiveCliUser(cliAuth.userId))) return null;
     return {
       userId: cliAuth.userId,
       username: cliAuth.username,

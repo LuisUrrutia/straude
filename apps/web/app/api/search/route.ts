@@ -4,28 +4,34 @@ import { createClient } from "@/lib/supabase/server";
 // Safe public fields only — never expose email, private settings, etc.
 const PUBLIC_USER_FIELDS = "id, username, display_name, bio, avatar_url, is_public";
 
-/** Strip characters that could break PostgREST filter syntax */
+/** Keep user-visible search text while removing PostgREST/ILIKE metacharacters. */
 function sanitizeFilter(s: string): string {
-  return s.replace(/[,()\\@]/g, "");
+  return s.normalize("NFKC").replace(/[^\p{L}\p{N}\s-]/gu, "").trim();
 }
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
 
   const q = request.nextUrl.searchParams.get("q") ?? "";
-  const limit = Math.min(
-    Number(request.nextUrl.searchParams.get("limit") ?? 20),
-    50
-  );
+  const requestedLimit = Number(request.nextUrl.searchParams.get("limit") ?? 20);
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.min(Math.max(Math.trunc(requestedLimit), 1), 50)
+    : 20;
 
-  if (q.length < 2) {
+  if (q.length < 2 || q.length > 64) {
     return NextResponse.json(
-      { error: "Query must be at least 2 characters" },
+      { error: "Query must be between 2 and 64 characters" },
       { status: 400 }
     );
   }
 
   const safe = sanitizeFilter(q);
+  if (safe.length < 2) {
+    return NextResponse.json(
+      { error: "Query must contain at least 2 searchable characters" },
+      { status: 400 },
+    );
+  }
 
   // Search by username, display name, or github_username
   const { data: users, error } = await supabase

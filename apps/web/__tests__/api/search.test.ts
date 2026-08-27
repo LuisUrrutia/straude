@@ -47,13 +47,22 @@ describe("GET /api/search", () => {
     mockClients();
     const res = await GET(makeRequest({ q: "a" }));
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toContain("at least 2 characters");
+    expect((await res.json()).error).toContain("between 2 and 64 characters");
   });
 
   it("returns 400 for empty query", async () => {
     mockClients();
     const res = await GET(makeRequest());
     expect(res.status).toBe(400);
+  });
+
+  it("rejects wildcard-only queries instead of turning them into a full scan", async () => {
+    const { supabaseChain } = mockClients();
+
+    const res = await GET(makeRequest({ q: "%%__" }));
+
+    expect(res.status).toBe(400);
+    expect(supabaseChain.or).not.toHaveBeenCalled();
   });
 
   it("searches by username and github_username via OR filter", async () => {
