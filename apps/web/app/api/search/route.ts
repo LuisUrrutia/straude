@@ -4,13 +4,10 @@ import { createClient } from "@/lib/supabase/server";
 // Safe public fields only — never expose email, private settings, etc.
 const PUBLIC_USER_FIELDS = "id, username, display_name, bio, avatar_url, is_public";
 
-/** Keep user-visible search text while neutralizing PostgREST/ILIKE metacharacters. */
-function sanitizeFilter(s: string): string {
-  return s
-    .normalize("NFKC")
-    .replace(/[^\p{L}\p{N}\s_-]/gu, "")
-    .trim()
-    .replaceAll("_", "\\_");
+function quoteIlikePattern(value: string): string {
+  const pattern = `%${value.replaceAll("%", "\\%").replaceAll("_", "\\_")}%`;
+  const escapedValue = pattern.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
+  return `"${escapedValue}"`;
 }
 
 export async function GET(request: NextRequest) {
@@ -29,20 +26,22 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const safe = sanitizeFilter(q);
-  if (safe.length < 2) {
+  const normalizedQuery = q.normalize("NFKC").trim();
+  const searchableCharacters = normalizedQuery.match(/[\p{L}\p{N}_-]/gu)?.length ?? 0;
+  if (searchableCharacters < 2) {
     return NextResponse.json(
       { error: "Query must contain at least 2 searchable characters" },
       { status: 400 },
     );
   }
+  const pattern = quoteIlikePattern(normalizedQuery);
 
   // Search by username, display name, or github_username
   const { data: users, error } = await supabase
     .from("users")
     .select(PUBLIC_USER_FIELDS)
     .eq("is_public", true)
-    .or(`username.ilike.%${safe}%,display_name.ilike.%${safe}%,github_username.ilike.%${safe}%`)
+    .or(`username.ilike.${pattern},display_name.ilike.${pattern},github_username.ilike.${pattern}`)
     .limit(limit);
 
   if (error) {

@@ -74,7 +74,20 @@ describe("GET /api/search", () => {
 
     expect(res.status).toBe(200);
     expect(supabaseChain.or).toHaveBeenCalledWith(
-      "username.ilike.%alice\\_dev%,display_name.ilike.%alice\\_dev%,github_username.ilike.%alice\\_dev%",
+      'username.ilike."%alice\\\\_dev%",display_name.ilike."%alice\\\\_dev%",github_username.ilike."%alice\\\\_dev%"',
+    );
+  });
+
+  it("preserves punctuation in display-name searches", async () => {
+    const { supabaseChain } = mockClients({
+      users: [{ id: "u-1", display_name: "O'Brien" }],
+    });
+
+    const res = await GET(makeRequest({ q: "O'Brien" }));
+
+    expect(res.status).toBe(200);
+    expect(supabaseChain.or).toHaveBeenCalledWith(
+      'username.ilike."%O\'Brien%",display_name.ilike."%O\'Brien%",github_username.ilike."%O\'Brien%"',
     );
   });
 
@@ -89,7 +102,7 @@ describe("GET /api/search", () => {
     expect(json.users).toHaveLength(1);
     expect(json.users[0].username).toBe("alice");
     expect(supabaseChain.or).toHaveBeenCalledWith(
-      "username.ilike.%alice%,display_name.ilike.%alice%,github_username.ilike.%alice%"
+      'username.ilike."%alice%",display_name.ilike."%alice%",github_username.ilike."%alice%"'
     );
   });
 
@@ -99,7 +112,7 @@ describe("GET /api/search", () => {
 
     await GET(makeRequest({ q: "bobgithub" }));
     expect(supabaseChain.or).toHaveBeenCalledWith(
-      "username.ilike.%bobgithub%,display_name.ilike.%bobgithub%,github_username.ilike.%bobgithub%"
+      'username.ilike."%bobgithub%",display_name.ilike."%bobgithub%",github_username.ilike."%bobgithub%"'
     );
   });
 
@@ -113,7 +126,7 @@ describe("GET /api/search", () => {
     expect(json.users).toEqual([]);
   });
 
-  it("still returns username matches that happen to contain @ in the query", async () => {
+  it("preserves at signs in the query without searching private email fields", async () => {
     const users = [{ id: "u-1", username: "user_at_sign" }];
     const { supabaseChain } = mockClients({ users });
 
@@ -122,7 +135,7 @@ describe("GET /api/search", () => {
 
     expect(res.status).toBe(200);
     expect(json.users).toHaveLength(1);
-    expect(supabaseChain.or.mock.calls[0]?.[0]).toContain("usersomething");
+    expect(supabaseChain.or.mock.calls[0]?.[0]).toContain("user@something");
   });
 
   it("respects limit parameter", async () => {
