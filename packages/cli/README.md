@@ -99,7 +99,7 @@ npx straude@latest
 # Daily sync (run this from a cron job or shell startup)
 straude
 
-# See what would be pushed without posting
+# Collect usage without submitting it
 straude push --dry-run
 
 # Backfill the last 3 days

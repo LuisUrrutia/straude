@@ -1,5 +1,15 @@
 # Architecture & Design Decisions
 
+## Negotiate curated Markdown through the Next.js proxy (2026-08-21)
+
+**Decision:** The agent independently chose q-value- and specificity-aware content negotiation in the existing Next.js 16 `proxy.ts`. Markdown-preferred requests for supported public informational pages rewrite to a dedicated internal route handler; ordinary HTML, API, asset, mutation, RSC, OAuth callback, and Supabase session behavior remain on their existing paths. Curated Markdown is available for `/`, `/about`, `/contact`, `/privacy`, `/cli`, and `/open`. Unknown document paths can return a recovery-oriented Markdown 404, while an explicit registry of existing static and dynamic page patterns prevents valid HTML-only routes from becoming false 404s.
+
+**Why:** App Router pages cannot define a `route.ts` beside `page.tsx`, so the request boundary is the narrowest place that can select a representation without replacing the existing React UI. Keeping Markdown in a route handler keeps file/content work and cache policy out of the proxy hot path. The pure Accept parser honors explicit rejections, wildcards, specificity, q-values, and client order; unsupported requests fail clearly with `406`.
+
+**Alternatives considered:** (a) Fetch each rendered HTML page and convert it to Markdown at request time. This would cover more pages automatically, but it adds a second render, recursion and cookie hazards, conversion ambiguity, personalized-content risk, and harder cache validation. Rejected. (b) Substring-match `text/markdown` in `next.config.ts` rewrites. This is smaller but mishandles q-values and explicit `q=0`, cannot issue correct `406` responses, and makes recovery 404s difficult. Rejected. (c) Refactor every marketing component around a shared document AST. This offers the strongest copy deduplication but would expand a protocol fix into a broad visual refactor. Deferred; curated representations are intentionally reviewed as agent-facing documents.
+
+**Trade-offs:** The route registry must be updated when a new application page is added, and curated Markdown can drift from visual copy. Tests lock the supported paths, headers, recovery links, and important product/privacy claims. Markdown and error responses emit `Vary: Accept, Accept-Encoding`; the global Next header configuration records the same invariant for rendered pages. Next.js 16's local production server replaces the rendered HTML `Vary: Accept` token with its RSC-specific list, so the deployed response must be rechecked after release even though the negotiated Markdown response is correct locally.
+
 ## Delegate all usage accounting to bundled ccusage v20 (2026-06-09)
 
 **Decision:** All supported coding-agent ingestion runs through a single installed `ccusage` v20 dependency invoked as a native binary. The current floor is `20.0.18`; Straude's native collectors, token normalizer, source whitelist, and pricing aliases are deleted, so Straude only parses ccusage's unified daily JSON into storage rows.
