@@ -4,6 +4,7 @@ vi.mock("../src/lib/posthog.js", () => ({
   posthog: {
     capture: vi.fn(),
     captureException: vi.fn(),
+    _shutdown: vi.fn(() => Promise.resolve()),
   },
 }));
 
@@ -17,6 +18,7 @@ import {
   isPushInvocation,
   reportCliException,
   reportUsagePushFailed,
+  shutdownTelemetryWithTimeout,
 } from "../src/lib/telemetry.js";
 
 const mockCapture = vi.mocked(posthog.capture);
@@ -72,5 +74,46 @@ describe("telemetry", () => {
       "alice",
       { command: "login" },
     );
+  });
+
+  it("swallows the posthog shutdown-timeout rejection instead of propagating it", async () => {
+    // @posthog/core rejects _shutdown with this string when flush exceeds the
+    // timeout. If it propagates, it becomes an unhandled rejection that
+    // exception autocapture re-reports and that skips the final process.exit.
+    vi.mocked(posthog._shutdown).mockRejectedValueOnce(
+      "Timeout while shutting down PostHog. Some events may not have been sent.",
+    );
+
+    await expect(shutdownTelemetryWithTimeout(10)).resolves.toBeTypeOf("number");
+  });
+
+  it("stays quiet when the local timer wins and the rejection lands later", async () => {
+    // posthog's own timeout and ours are both 150 ms, so the rejection can land
+    // after the local timer already resolved. Promise.race subscribes to both
+    // inputs, so that late rejection is already handled — this pins that down
+    // so a refactor away from Promise.race can't silently reintroduce a
+    // late unhandled rejection.
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+    try {
+      vi.mocked(posthog._shutdown).mockReturnValueOnce(
+        new Promise((_resolve, reject) =>
+          setTimeout(
+            () =>
+              reject(
+                "Timeout while shutting down PostHog. Some events may not have been sent.",
+              ),
+            20,
+          ),
+        ),
+      );
+
+      await expect(shutdownTelemetryWithTimeout(1)).resolves.toBeTypeOf("number");
+      await new Promise((resolve) => setTimeout(resolve, 60));
+
+      expect(unhandled).not.toHaveBeenCalled();
+    } finally {
+      process.off("unhandledRejection", unhandled);
+    }
   });
 });

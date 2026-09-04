@@ -29,6 +29,17 @@ The GitHub README stats card shipped as a single compact PNG. Future enhancement
 - **Card customization** — Custom accent color, show/hide specific stats, border radius options via query params.
 - **Embed analytics** — Track how many times a card is fetched to measure backlink effectiveness.
 
+### Surface Multi-Agent CLI Support
+
+Straude already ingests usage from far more than Claude Code and Codex, and nobody knows it. The CLI shells out to `ccusage daily --json` with no source scoping (`packages/cli/src/lib/ccusage.ts:454`), and `ccusage@^20.0.16` detects Gemini CLI, Qwen, Kimi, GitHub Copilot CLI, Amp, Droid, OpenCode, Goose and others. Nothing downstream is hardcoded: `CcusageAgent` is `string`, agent names come from `metadata.agents` per row, and `/api/usage/submit` only checks that they are non-empty strings — no allowlist.
+
+Discovered while triaging PRs #77 and #22, both of which hand-wrote parsers for capability the collector already has. Work to make it real to users:
+
+- `prettifyModel` cases for Gemini, Qwen, Kimi and Copilot model IDs, so they read as product names rather than raw slugs.
+- Deliberate entries in `MODEL_COLOR_PATTERNS` for those families, so they get a chosen colour instead of a hashed one from the fallback palette.
+- Landing-page and README copy naming the supported agents. "Works with your whole toolkit" is a stronger acquisition line than "works with Claude Code", and it costs no engineering.
+- Mistral Vibe is the one real gap — it is not a ccusage source. Best path is upstreaming it to ccusage rather than carrying a Straude-local parser.
+
 ### Team / Org Workspaces
 
 Private groups where a company's eng team shares a scoped leaderboard, combined contribution graph, and team streak. A manager signs up, invites 10 engineers, and all 10 become users with a built-in audience. The team admin cares about the spend dashboard the same way they care about a cloud bill — this is a B2B wedge that doesn't require viral growth. Requires invites, permissions, team-scoped views, and billing context.
@@ -124,9 +135,6 @@ Extension of Team/Org Workspaces with premium features: private team leaderboard
 ### Client-side email validation before OTP send
 Login form uses `type="email"` + `required` but no check for common mistakes (missing TLD, etc.) before the network request. Low effort, low impact.
 
-### Model colors outside design system
-`ActivityCard.tsx:147-158` uses hardcoded hex colors for model chips. Should be extracted to `lib/constants/model-colors.ts` for consistency.
-
 ### Typing indicators in DMs
 No typing indicators in direct messages. Would require Supabase Realtime presence channels.
 
@@ -160,6 +168,12 @@ Now that `device_usage` stores per-device data, future work could expose this in
 ### Rate Limiting on Data Creation Endpoints
 
 The CLI auth init endpoint has rate limiting (5 req/min/IP), but other write endpoints (comments, follows, kudos, upload, usage submit) do not. Consider per-user rate limiting via a shared utility or Supabase Edge Function middleware. Priority: `/api/upload` (file creation), `/api/usage/submit` (data creation), then social actions.
+
+### `calculate_user_streak` Is Callable by `anon` with Any User ID
+
+`public.calculate_user_streak(UUID, INTEGER)` is `SECURITY DEFINER` and granted `EXECUTE` to both `anon` and `authenticated` (`supabase/migrations/20260430172022_fix_calculate_user_streak_security_definer.sql:85-86`). Because the definer bypasses RLS, anyone can POST to the PostgREST RPC endpoint with an arbitrary `p_user_id` and read that user's streak — including users who set their profile to private. It also works as a presence oracle: a non-zero return means the account has recent usage.
+
+Every caller in the app is server-side and already uses the service client, so the `anon` and `authenticated` grants appear to be unnecessary surface rather than something the front end depends on. Verify that against `apps/web` call sites, then revoke both grants and keep `service_role`. Long-standing, not introduced by any open PR; found while reviewing #147.
 
 ## CSP Hardening (Nonce-Based)
 

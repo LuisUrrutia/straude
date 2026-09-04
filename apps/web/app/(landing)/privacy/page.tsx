@@ -61,7 +61,7 @@ export default function PrivacyPage() {
                 <code className="rounded bg-background px-1.5 py-0.5 text-xs font-medium">
                   npx straude --dry-run
                 </code>{" "}
-                shows you the exact payload before anything is sent.
+                collects usage without submitting it.
               </p>
             </section>
 
