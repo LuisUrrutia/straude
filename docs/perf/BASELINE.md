@@ -1,5 +1,10 @@
 # M0 performance baseline
 
+> Review update (2026-09-04): July measurements below are historical. The reviewed
+> revision preserves server-confirmed auth, reads live leaderboards, and uses only
+> request-level sidebar deduplication. Those earlier numbers are not current proof.
+> See `docs/DECISIONS.md` for the current data and performance contract.
+
 Captured on 2026-07-18 from a local production build before the subsequent
 auth-consolidation edits in the working tree.
 

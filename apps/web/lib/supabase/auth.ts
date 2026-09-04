@@ -24,18 +24,13 @@ export type AuthContext = {
 
 export const getAuthIdentity = cache(async (): Promise<AuthIdentity | null> => {
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.getClaims();
-  const subject = data?.claims.sub;
-  const email = data?.claims.email;
+  // Keep the Auth server check before service-role reads of private user data.
+  const { data, error } = await supabase.auth.getUser();
+  const user = data?.user;
 
-  if (error || typeof subject !== "string" || subject.length === 0) {
-    return null;
-  }
+  if (error || !user?.id) return null;
 
-  return {
-    id: subject,
-    email: typeof email === "string" ? email : null,
-  };
+  return { id: user.id, email: user.email ?? null };
 });
 
 export const getAuthContext = cache(async (): Promise<AuthContext> => {

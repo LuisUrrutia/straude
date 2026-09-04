@@ -1,5 +1,10 @@
 # Database performance evidence
 
+> Review update (2026-09-04): July measurements below are historical. The reviewed
+> revision preserves server-confirmed auth, reads live leaderboards, and uses only
+> request-level sidebar deduplication. Those earlier numbers are not current proof.
+> See `docs/DECISIONS.md` for the current data and performance contract.
+
 Recorded 2026-07-18 against Supabase project `kanfzeovbmusnhmbnhit`. The M4
 snapshot migration and its follow-up foreign-key index are live.
 

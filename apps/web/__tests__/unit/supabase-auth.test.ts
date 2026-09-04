@@ -1,18 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
-  const getClaims = vi.fn();
+  const getUser = vi.fn();
   const single = vi.fn();
   const eq = vi.fn(() => ({ single }));
   const select = vi.fn(() => ({ eq }));
   const from = vi.fn(() => ({ select }));
 
-  return { getClaims, single, eq, select, from };
+  return { getUser, single, eq, select, from };
 });
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => ({
-    auth: { getClaims: mocks.getClaims },
+    auth: { getUser: mocks.getUser },
   })),
 }));
 
@@ -25,10 +25,10 @@ import { getAuthContext, getAuthIdentity } from "@/lib/supabase/auth";
 describe("Supabase auth context", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getClaims.mockResolvedValue({
+    mocks.getUser.mockResolvedValue({
       data: {
-        claims: {
-          sub: "user-123",
+        user: {
+          id: "user-123",
           email: "person@example.com",
         },
       },
@@ -48,7 +48,7 @@ describe("Supabase auth context", () => {
     });
   });
 
-  it("derives a minimal verified identity from JWT claims", async () => {
+  it("derives a minimal verified identity from the Auth server", async () => {
     await expect(getAuthIdentity()).resolves.toEqual({
       id: "user-123",
       email: "person@example.com",
@@ -67,9 +67,9 @@ describe("Supabase auth context", () => {
     expect(mocks.single).toHaveBeenCalledOnce();
   });
 
-  it("does not query a profile when verified claims have no subject", async () => {
-    mocks.getClaims.mockResolvedValueOnce({
-      data: { claims: {} },
+  it("does not query a profile when server-confirmed identity have no subject", async () => {
+    mocks.getUser.mockResolvedValueOnce({
+      data: { user: {} },
       error: null,
     });
 
@@ -79,4 +79,14 @@ describe("Supabase auth context", () => {
     });
     expect(mocks.from).not.toHaveBeenCalled();
   });
+
+  it("does not use an identity when the Auth server rejects the token", async () => {
+    mocks.getUser.mockResolvedValueOnce({
+      data: { user: { id: "user-123", email: "person@example.com" } },
+      error: { message: "session rejected" },
+    });
+    await expect(getAuthContext()).resolves.toEqual({ identity: null, profile: null });
+    expect(mocks.from).not.toHaveBeenCalled();
+  });
+
 });

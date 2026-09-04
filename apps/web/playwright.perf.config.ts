@@ -1,7 +1,7 @@
 import { defineConfig } from "@playwright/test";
 
 // Performance harness: measures TTFB/FCP/LCP for every authenticated page
-// against a production build talking to the real Supabase project.
+// against a production build. Remote Supabase requires PERF_ALLOW_REMOTE=1.
 // `bun run perf` = measure + scorecard; `bun run perf:check` = gate on targets.
 const port = 3197;
 export default defineConfig({

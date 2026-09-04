@@ -2,7 +2,12 @@ import { test as setup, expect } from "@playwright/test";
 import { createServerClient } from "@supabase/ssr";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { AUTH_STATE_PATH, TARGETS_PATH, loadWebEnv } from "./env";
+import {
+  AUTH_STATE_PATH,
+  TARGETS_PATH,
+  assertPerfSupabaseUrl,
+  loadWebEnv,
+} from "./env";
 
 // Signs in the perf test user programmatically and saves the session as a
 // Playwright storageState. Uses @supabase/ssr's own server client with an
@@ -10,6 +15,8 @@ import { AUTH_STATE_PATH, TARGETS_PATH, loadWebEnv } from "./env";
 // by the library itself, not reimplemented here.
 setup("authenticate perf user and discover targets", async () => {
   const env = loadWebEnv();
+  assertPerfSupabaseUrl(env.NEXT_PUBLIC_SUPABASE_URL, env.PERF_ALLOW_REMOTE);
+
   const email = env.PERF_TEST_EMAIL;
   const password = env.PERF_TEST_PASSWORD;
   expect(email, "PERF_TEST_EMAIL missing from apps/web/.env.local").toBeTruthy();

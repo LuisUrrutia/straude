@@ -1,5 +1,10 @@
 # Client bundle baseline
 
+> Review update (2026-09-04): July measurements below are historical. The reviewed
+> revision preserves server-confirmed auth, reads live leaderboards, and uses only
+> request-level sidebar deduplication. Those earlier numbers are not current proof.
+> See `docs/DECISIONS.md` for the current data and performance contract.
+
 Captured on 2026-07-18 with Next.js 16.2.6 and
 `@next/bundle-analyzer` 16.2.6.
 

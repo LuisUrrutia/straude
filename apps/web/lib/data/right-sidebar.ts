@@ -1,4 +1,4 @@
-import { unstable_cache } from "next/cache";
+import { cache } from "react";
 import { loadLeaderboardEntries } from "@/lib/data/leaderboard";
 import { getServiceClient } from "@/lib/supabase/service";
 import type {
@@ -29,7 +29,8 @@ function firstUser(relation: ActiveUserRow["users"]) {
   return Array.isArray(relation) ? relation[0] : relation;
 }
 
-export const loadRightSidebarPublicData = unstable_cache(
+// A public profile can become private between requests. Never persist candidates.
+export const loadRightSidebarPublicData = cache(
   async (): Promise<RightSidebarPublicData> => {
     const service = getServiceClient();
     const [leaderboard, pinnedResult, activeResult, signupResult] =
@@ -99,7 +100,5 @@ export const loadRightSidebarPublicData = unstable_cache(
         total_cost: entry.total_cost,
       })),
     };
-  },
-  ["right-sidebar-public-candidates"],
-  { revalidate: 600, tags: ["leaderboard", "right-sidebar-public"] }
+  }
 );

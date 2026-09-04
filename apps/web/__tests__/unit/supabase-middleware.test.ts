@@ -8,7 +8,7 @@ type CookieToSet = {
 };
 
 const mocks = vi.hoisted(() => ({
-  getClaims: vi.fn(),
+  getUser: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/env", () => ({
@@ -30,7 +30,7 @@ vi.mock("@supabase/ssr", () => ({
           options: { httpOnly: true, path: "/" },
         },
       ]);
-      return { auth: { getClaims: mocks.getClaims } };
+      return { auth: { getUser: mocks.getUser } };
     }
   ),
 }));
@@ -44,9 +44,9 @@ describe("Supabase middleware auth", () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "test-key");
   });
 
-  it("uses verified claims and preserves refreshed cookies on redirects", async () => {
-    mocks.getClaims.mockResolvedValue({
-      data: { claims: { sub: "user-123" } },
+  it("uses server-confirmed identity and preserves refreshed cookies on redirects", async () => {
+    mocks.getUser.mockResolvedValue({
+      data: { user: { id: "user-123" } },
       error: null,
     });
 
@@ -60,11 +60,11 @@ describe("Supabase middleware auth", () => {
       "refreshed-token"
     );
     expect(response.headers.get("Server-Timing")).toMatch(/^mw-auth;dur=\d+$/);
-    expect(mocks.getClaims).toHaveBeenCalledOnce();
+    expect(mocks.getUser).toHaveBeenCalledOnce();
   });
 
   it("redirects an unverified protected request to login", async () => {
-    mocks.getClaims.mockResolvedValue({ data: null, error: null });
+    mocks.getUser.mockResolvedValue({ data: null, error: null });
 
     const response = await updateSession(
       new NextRequest("https://straude.com/messages")

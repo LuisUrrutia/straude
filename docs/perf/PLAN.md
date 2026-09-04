@@ -1,5 +1,10 @@
 # Straude Performance Mission: every core page < 500ms
 
+> Review update (2026-09-04): July measurements below are historical. The reviewed
+> revision preserves server-confirmed auth, reads live leaderboards, and uses only
+> request-level sidebar deduplication. Those earlier numbers are not current proof.
+> See `docs/DECISIONS.md` for the current data and performance contract.
+
 ## Milestone status
 
 - [x] M0 harness — acceptance: `bun run perf` scorecard for all 10 pages; `BASELINE.md` ready for the owner commit

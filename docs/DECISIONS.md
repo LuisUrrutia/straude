@@ -1,20 +1,20 @@
 # Architecture & Design Decisions
 
-## Authenticated Request Verification Uses Asymmetric ES256 Claims (2026-07-18)
+## Preserve Live Privacy, Rank, and Auth Checks (2026-09-04)
 
-**Decision:** Use Supabase asymmetric ES256 signing keys and verify authenticated request cookies in middleware with `getClaims()`. Keep authorization and data access on trusted server boundaries; the claims check replaces the remote middleware identity round trip, not application authorization.
+**Decision:** Deduplicate server identity, shell profiles, leaderboards, and sidebar candidates only within a request. Both middleware and the shared identity loader retain Supabase `getUser()`. Leaderboard listings and ranks read the existing live views, matching the CLI and profile readers.
 
-**Why:** The previous middleware `getUser()` call contacted Supabase on every navigation before the application could render. Local JWKS-backed claim verification reduced measured middleware auth from 25-30ms to 0-1ms and helped every authenticated route pass the TTFB gate.
+**Alternatives considered:** (a) Keep persistent snapshot caches and add freshness validation, live visibility filtering, and invalidation for every usage and privacy mutation. This saves aggregate reads but creates more cache ownership and can still disagree with live ranks. (b) Keep live views and request-only deduplication. Chosen: the historical SQL difference was about 2.5ms, while immediate first-sync ranks and privacy changes affect user trust.
 
-**Tradeoff:** Signing-key rollout and CLI authentication must be regression-tested together. Claim verification proves the signed identity, while pages and APIs must still enforce privacy and ownership when reading data.
+**Auth trade-off:** Local `getClaims()` verifies token signatures cheaply but does not fetch the current Auth user. The earlier version removed the server check; this revision retains main's behavior. Neither method alone promises immediate sign-out revocation for an unexpired access token. Strict revocation requires validating `session_id` against `auth.sessions`; that broader auth contract is unchanged. See [Supabase session guidance](https://supabase.com/docs/guides/auth/sessions#how-to-ensure-an-access-token-jwt-cannot-be-used-after-a-user-signs-out).
 
-## Private Periodic Snapshots for Public Aggregate Data (2026-07-18)
+## Bound Profile Snapshot Age and Keep a Live Fallback (2026-09-04)
 
-**Decision:** Materialize leaderboard rows and profile radar percentiles into private, service-role-only snapshot tables. Refresh both transactionally with one SECURITY DEFINER function scheduled by `pg_cron` every 10 minutes. Request paths read snapshots first and retain the existing leaderboard views as a rollout fallback.
+**Decision:** Read profile radar snapshots through the service client after the caller's existing live profile-access check. Accept snapshots at most 20 minutes old. Missing rows, unavailable migrations, and stale or invalid timestamps use the previous live calculation. Only request-level deduplication applies to snapshot reads.
 
-**Why:** The data is public aggregate output, but computing it required repeated full-table scans. Private snapshots allow bounded `unstable_cache` use for the shared result without exposing the underlying tables or accidentally caching personalized data. One transaction ensures readers see either the previous complete snapshot or the next complete snapshot.
+**Why:** New users and stopped refresh jobs must not lose their chart. The live fallback retains main's five-minute distribution cache and fails clearly on query errors. Snapshot tables remain private, and the already-deployed migrations remain in history. User-facing leaderboard reads no longer use the leaderboard snapshot table.
 
-**Tradeoff:** Rankings and radar scores may be up to 10 minutes stale. The migration requires a production apply plus an advisor and EXPLAIN comparison; until then, the application falls back to existing views.
+**Trade-off:** Radar percentiles may lag usage by up to 20 minutes before the live fallback takes over. This is separate from rank and spend totals, which remain live. The background refresh still computes leaderboard rows; removing that already-deployed work needs a separate migration.
 
 ## Server Initial Data, Route Loading, and Bundle Analysis (2026-07-18)
 
@@ -24,13 +24,11 @@
 
 **Tradeoff:** The actual useful page can become the LCP candidate, so a metric may rise from a trivial loading label even when the page is more usable. Heavy dependencies that were already correctly lazy-loaded remain unchanged.
 
-## Local Performance Gate and Post-Deploy RUM (2026-07-18)
+## Local Performance Measurements and Post-Deploy RUM (2026-09-04)
 
-**Decision:** Gate the mission locally on `bun run perf:check`: TTFB under 300ms and LCP under 500ms for all 10 authenticated pages in a production build. Treat PostHog p75 web vitals as a post-deploy honesty check, not a blocker for the local goal.
+**Decision:** Keep the production-build Playwright measurement harness and optional `perf:check` thresholds. Before recording metrics, verify the target returns success, remains on the intended route, and has an authenticated application shell. Remote Supabase projects require explicit `PERF_ALLOW_REMOTE=1`; default verification uses a local fixture.
 
-**Result:** The 2026-07-18 17:04 run passed 10/10 pages, with TTFB 33-42ms, LCP 94-466ms, and the right-sidebar API at 52ms. M3 waterfall work and the combined M4/M5 snapshot/cache work landed before this final score; M6 then completed server-first rendering and bundle reductions.
-
-**Remaining acceptance:** Repeat the clean local scorecard once more for the two-consecutive-run M7 criterion, apply and verify the database migration in production, and confirm `$web_vitals` after deploy.
+**Evidence boundary:** The July scorecards describe the earlier claims-only authentication and persistent snapshot-cache implementation. They do not prove performance of this revision or a production p75 result. Compare current main and this revision using the same runtime, seed, and browser before claiming a numerical improvement. PostHog web vitals remain a post-deploy check.
 
 ## Negotiate curated Markdown through the Next.js proxy (2026-08-21)
 

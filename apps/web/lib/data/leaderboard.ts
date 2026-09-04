@@ -1,4 +1,4 @@
-import { unstable_cache } from "next/cache";
+import { cache } from "react";
 import { getServiceClient } from "@/lib/supabase/service";
 
 export const LEADERBOARD_PERIODS = ["day", "week", "month", "all_time"] as const;
@@ -39,44 +39,28 @@ async function queryLeaderboard({
   limit,
 }: LeaderboardQuery): Promise<LeaderboardRow[]> {
   const db = getServiceClient();
-  let snapshotQuery = db
-    .from("leaderboard_snapshots")
-    .select(LEADERBOARD_SELECT)
-    .eq("period", period)
-    .order("total_cost", { ascending: false })
-    .limit(limit);
-
-  if (region) snapshotQuery = snapshotQuery.eq("region", region);
-  if (cursor) snapshotQuery = snapshotQuery.lt("total_cost", cursor);
-
-  const snapshot = await snapshotQuery;
-  if (!snapshot.error) {
-    return (snapshot.data ?? []) as LeaderboardRow[];
-  }
-
-  let fallbackQuery = db
+  let query = db
     .from(VIEW_BY_PERIOD[period])
     .select(LEADERBOARD_SELECT)
     .order("total_cost", { ascending: false })
     .limit(limit);
 
-  if (region) fallbackQuery = fallbackQuery.eq("region", region);
-  if (cursor) fallbackQuery = fallbackQuery.lt("total_cost", cursor);
+  if (region) query = query.eq("region", region);
+  if (cursor) query = query.lt("total_cost", cursor);
 
-  const fallback = await fallbackQuery;
-  if (fallback.error) throw new Error(fallback.error.message);
-  return (fallback.data ?? []) as LeaderboardRow[];
+  const result = await query;
+  if (result.error) throw new Error(result.error.message);
+  return (result.data ?? []) as LeaderboardRow[];
 }
 
-const loadCachedLeaderboard = unstable_cache(
+// Request-only deduplication keeps privacy changes and newly submitted usage live.
+const loadCachedLeaderboard = cache(
   async (
     period: LeaderboardPeriod,
     region: string | null,
     cursor: string | null,
     limit: number
-  ) => queryLeaderboard({ period, region, cursor, limit }),
-  ["public-leaderboard-snapshot-first"],
-  { revalidate: 600, tags: ["leaderboard"] }
+  ) => queryLeaderboard({ period, region, cursor, limit })
 );
 
 export function loadLeaderboardEntries(query: LeaderboardQuery) {
@@ -94,23 +78,12 @@ async function queryLeaderboardRank(
   region: string | null
 ): Promise<number | null> {
   const db = getServiceClient();
-  const snapshotEntry = await db
-    .from("leaderboard_snapshots")
+  const source = VIEW_BY_PERIOD[period];
+  const entry = await db
+    .from(source)
     .select("total_cost")
-    .eq("period", period)
     .eq("user_id", userId)
     .maybeSingle();
-
-  const source = snapshotEntry.error
-    ? VIEW_BY_PERIOD[period]
-    : "leaderboard_snapshots";
-  const entry = snapshotEntry.error
-    ? await db
-        .from(source)
-        .select("total_cost")
-        .eq("user_id", userId)
-        .maybeSingle()
-    : snapshotEntry;
 
   if (entry.error || !entry.data) return null;
 
@@ -119,20 +92,13 @@ async function queryLeaderboardRank(
     .select("*", { count: "exact", head: true })
     .gt("total_cost", entry.data.total_cost);
 
-  if (source === "leaderboard_snapshots") {
-    countQuery = countQuery.eq("period", period);
-  }
   if (region) countQuery = countQuery.eq("region", region);
 
   const { count, error } = await countQuery;
   return error ? null : (count ?? 0) + 1;
 }
 
-const loadCachedLeaderboardRank = unstable_cache(
-  queryLeaderboardRank,
-  ["public-leaderboard-rank-snapshot-first"],
-  { revalidate: 600, tags: ["leaderboard"] }
-);
+const loadCachedLeaderboardRank = cache(queryLeaderboardRank);
 
 export function loadLeaderboardRank(
   period: LeaderboardPeriod,

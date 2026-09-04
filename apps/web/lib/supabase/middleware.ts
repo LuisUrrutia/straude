@@ -66,9 +66,8 @@ export async function updateSession(request: NextRequest) {
   );
 
   const authStart = Date.now();
-  const { data } = await supabase.auth.getClaims();
-  const userId =
-    typeof data?.claims.sub === "string" ? data.claims.sub : null;
+  const { data, error } = await supabase.auth.getUser();
+  const userId = error ? null : data?.user?.id ?? null;
   // Surfaced to the perf harness and RUM via the Server-Timing response header
   supabaseResponse.headers.set(
     "Server-Timing",

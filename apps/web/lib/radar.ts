@@ -1,4 +1,4 @@
-import { unstable_cache } from "next/cache";
+import { cache } from "react";
 import { getServiceClient } from "@/lib/supabase/service";
 
 export type RadarScores = {
@@ -15,19 +15,27 @@ type ProfileStatsRow = {
   consistency: number;
   toolkit: number;
   community: number;
+  refreshed_at: string;
 };
 
-const loadRadarScores = unstable_cache(async (userId: string): Promise<RadarScores> => {
+const MAX_SNAPSHOT_AGE_MS = 20 * 60 * 1000;
+
+const loadRadarScores = cache(async (userId: string): Promise<RadarScores> => {
   const db = getServiceClient();
   const { data, error } = await db
-    .rpc("get_profile_stats", { p_user_id: userId })
-    .single();
+    .from("profile_stats_snapshots")
+    .select("output, intensity, consistency, toolkit, community, refreshed_at")
+    .eq("user_id", userId)
+    .maybeSingle();
 
-  if (error || !data) {
-    throw new Error(error?.message ?? "Profile stats snapshot is unavailable.");
+  const scores = data as ProfileStatsRow | null;
+  const age = scores ? Date.now() - Date.parse(scores.refreshed_at) : NaN;
+  if (error || !scores || !Number.isFinite(age) || age < 0 || age > MAX_SNAPSHOT_AGE_MS) {
+    // A missing row or stopped refresh must not hide the chart indefinitely.
+    const { computeLiveRadarScores } = await import("@/lib/radar-live");
+    return computeLiveRadarScores(userId);
   }
 
-  const scores = data as ProfileStatsRow;
   return {
     output: Number(scores.output) || 0,
     intensity: Number(scores.intensity) || 0,
@@ -35,9 +43,6 @@ const loadRadarScores = unstable_cache(async (userId: string): Promise<RadarScor
     toolkit: Number(scores.toolkit) || 0,
     community: Number(scores.community) || 0,
   };
-}, ["public-profile-radar-snapshot"], {
-  revalidate: 600,
-  tags: ["profile-stats"],
 });
 
 export function computeRadarScores(userId: string): Promise<RadarScores> {

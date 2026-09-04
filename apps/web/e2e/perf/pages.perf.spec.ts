@@ -10,7 +10,7 @@ import {
   type RunMetrics,
 } from "./scorecard";
 
-// Targets from docs/perf/PLAN.md (user-approved definition of done).
+// Optional historical targets; functional checks always run.
 const GATE = process.env.PERF_GATE === "1";
 
 type Targets = { profileUsername: string; postId: string };
@@ -36,7 +36,12 @@ const results: PageResult[] = [];
 let rightSidebarMs: number | null = null;
 
 async function measureRun(page: Page, url: string): Promise<RunMetrics> {
-  await page.goto(url, { waitUntil: "load" });
+  const response = await page.goto(url, { waitUntil: "load" });
+  expect(response?.ok(), `${url}: navigation failed`).toBeTruthy();
+  await expect(page).toHaveURL(url);
+  // A fast login, onboarding redirect, or error document is not a page result.
+  await expect(page.locator("#__perf-server-timing")).toBeAttached();
+  await expect(page.getByText("Application error:", { exact: false })).toHaveCount(0);
   return page.evaluate(async () => {
     const nav = performance.getEntriesByType(
       "navigation"

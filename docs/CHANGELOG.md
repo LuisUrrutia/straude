@@ -18,8 +18,8 @@
 
 ### Added
 
-- **Authenticated performance harness and local performance gate.** A production-build Playwright harness measures warm TTFB, FCP, LCP, middleware auth, layout attribution, and the right-sidebar API across 10 core authenticated pages. The final 2026-07-18 local run passed all 10 pages: TTFB 33-42ms, LCP 94-466ms, and right-sidebar 52ms.
-- **Private leaderboard and profile-stat snapshots.** Service-role-only snapshot tables move global leaderboard and radar aggregation out of request paths. A `pg_cron` job refreshes them transactionally every 10 minutes, with existing leaderboard views retained as a rollout fallback and a covering usage index added for aggregation.
+- **Authenticated performance harness and local performance gate.** A production-build Playwright harness measures warm TTFB, FCP, LCP, middleware auth, layout attribution, and the right-sidebar API across 10 core authenticated pages. It validates authenticated navigation before recording metrics and requires an explicit opt-in for remote Supabase projects. July scorecards are historical; current timings need a new comparison.
+- **Private leaderboard and profile-stat snapshots.** Service-role-only tables store radar percentiles and historical leaderboard aggregates. A `pg_cron` job refreshes them transactionally every 10 minutes. Radar reads fall back to the existing live calculation when rows are missing, stale, or unavailable. User-facing leaderboard listings and ranks remain live so first syncs and privacy changes take effect immediately.
 - **Route loading shells and bundle analysis.** All authenticated gating routes now have accessible loading boundaries. `@next/bundle-analyzer` runs behind `ANALYZE=1`; making the development-only Agentation toolbar lazy removed about 39 KiB gzip from every authenticated route's initial JavaScript.
 
 - **Public trust and agent guidance surfaces.** Added substantive `/about` and `/contact` pages, proposal-conformant `/llms.txt` with concrete when-to-use and safety guidance, negotiated Markdown for `/`, `/about`, `/contact`, `/privacy`, `/cli`, and `/open`, and complete Organization JSON-LD with the established Pacific Systems legal name, support email, and country-only US postal address. Dry-run guidance consistently describes collection without submission. Footer and sitemap links expose the new pages.
@@ -27,8 +27,8 @@
 
 ### Changed
 
-- **Authenticated requests now use asymmetric ES256 JWT verification.** Supabase signing was moved to asymmetric keys and middleware uses `getClaims()` for local JWKS-backed verification, eliminating the remote `getUser()` round trip from the request gate while retaining server-side authorization checks where user data is read.
-- **Core authenticated pages render useful initial data from the server.** Settings, search, card, and recap no longer fetch their initial state after mount. Shared public leaderboard/right-sidebar reads use bounded server caches, while private and user-scoped reads remain request-scoped to prevent cross-user leakage.
+- **Authenticated pages share server-confirmed identity and profile reads.** Request-only deduplication removes repeated work across layouts and pages while preserving `getUser()` and current privacy checks.
+- **Core authenticated pages render useful initial data from the server.** Settings, search, card, and recap no longer fetch their initial state after mount. Leaderboard and sidebar data use request-only deduplication, so privacy changes and fresh usage are visible on the next request.
 
 - **Extracted `ActivityCard`'s hardcoded model chip colors** into `apps/web/lib/constants/model-colors.ts`, which now owns the whole name-to-colour decision (`modelColor`) rather than exporting raw tables for callers to recombine. Same colors, same matching order, per the design-system-consistency roadmap item.
 

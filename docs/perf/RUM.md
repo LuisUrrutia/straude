@@ -1,5 +1,10 @@
 # PostHog real-user performance monitoring
 
+> Review update (2026-09-04): July measurements below are historical. The reviewed
+> revision preserves server-confirmed auth, reads live leaderboards, and uses only
+> request-level sidebar deduplication. Those earlier numbers are not current proof.
+> See `docs/DECISIONS.md` for the current data and performance contract.
+
 Straude records real-user performance only after analytics consent:
 
 - PostHog's built-in `$web_vitals` event records LCP, CLS, FCP, and INP.
