@@ -1,5 +1,7 @@
 # ccusage upstream compatibility review
 
+Current integration note (2026-09-04): the collector floor and repository lock now use 20.0.20, preserving the open-ended stable range and adding the released Grok source. The measurements below describe the original July audit.
+
 Date: 2026-07-23
 
 ## Verdict

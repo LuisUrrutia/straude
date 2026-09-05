@@ -3,7 +3,7 @@ import { chmodSync, readFileSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { DEFAULT_SUBPROCESS_TIMEOUT_MS } from "../config.js";
 
-export const CCUSAGE_MIN_VERSION = "20.0.18";
+export const CCUSAGE_MIN_VERSION = "20.0.20";
 export const CCUSAGE_CLAUDE_COLLECTOR = "ccusage-claude-v20" as const;
 export const CCUSAGE_CODEX_COLLECTOR = "ccusage-codex-v20" as const;
 export const CCUSAGE_DEFAULT_PRICING_MODE = "online" as const;

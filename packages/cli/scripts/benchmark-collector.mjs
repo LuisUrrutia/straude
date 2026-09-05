@@ -36,11 +36,11 @@ if (
   || (
     Number(collectorVersion[1]) === 20
     && Number(collectorVersion[2]) === 0
-    && Number(collectorVersion[3]) < 18
+    && Number(collectorVersion[3]) < 20
   )
 ) {
   throw new Error(
-    `Expected stable ccusage >=20.0.18, found ${collectorPackage.version}`,
+    `Expected stable ccusage >=20.0.20, found ${collectorPackage.version}`,
   );
 }
 if (!Number.isInteger(iterations) || iterations < 3) {

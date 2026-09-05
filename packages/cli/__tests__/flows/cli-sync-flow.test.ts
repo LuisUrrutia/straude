@@ -50,7 +50,7 @@ vi.mock("node:fs", () => ({
 
 import { pushCommand } from "../../src/commands/push.js";
 import { CONFIG_FILE } from "../../src/config.js";
-import { _resetCcusageResolver, _setCcusageCommandForTests } from "../../src/lib/ccusage.js";
+import { CCUSAGE_MIN_VERSION, _resetCcusageResolver, _setCcusageCommandForTests } from "../../src/lib/ccusage.js";
 
 class ExitError extends Error {
   code: number;
@@ -148,7 +148,7 @@ function ccusageJson(date = todayStr()) {
   });
 }
 
-const TEST_CCUSAGE_VERSION = "20.0.18";
+const TEST_CCUSAGE_VERSION = CCUSAGE_MIN_VERSION;
 
 function mockCcusage(json = ccusageJson()) {
   execFileMock.mockImplementation((_cmd: string, _args: string[], _options: unknown, callback: (err: Error | null, stdout: string, stderr: string) => void) => {

@@ -14,14 +14,14 @@ const npmCommand = process.platform === "win32"
       prefixArgs: [join(dirname(process.execPath), "node_modules", "npm", "bin", "npm-cli.js")],
     }
   : { executable: "npm", prefixArgs: [] };
-const expectedCcusageRange = ">=20.0.18";
+const expectedCcusageRange = ">=20.0.20";
 
 function isCompatibleCcusageVersion(version) {
   const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/
     .exec(version);
   if (!match) return false;
   const [, major, minor, patch] = match.map(Number);
-  return major > 20 || (major === 20 && (minor > 0 || patch >= 18));
+  return major > 20 || (major === 20 && (minor > 0 || patch >= 20));
 }
 
 function readOption(name) {
@@ -127,7 +127,7 @@ try {
   );
   if (!isCompatibleCcusageVersion(installedCcusage.version)) {
     throw new Error(
-      `Packed CLI installed incompatible ccusage ${installedCcusage.version}; expected a stable version >=20.0.18`,
+      `Packed CLI installed incompatible ccusage ${installedCcusage.version}; expected a stable version >=20.0.20`,
     );
   }
 

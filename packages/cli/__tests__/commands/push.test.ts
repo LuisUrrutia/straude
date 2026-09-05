@@ -166,11 +166,11 @@ function collected(entries = [usageEntry()]) {
     agents: ["codex"],
     collector: {
       codex: "ccusage-codex-v20",
-      ccusage_version: "20.0.18",
+      ccusage_version: "20.0.20",
       ccusage_agents: ["codex"],
       pricing_mode: "online",
     },
-    version: "20.0.18",
+    version: "20.0.20",
     raw: "{}",
     stderr: "",
   };
@@ -258,7 +258,7 @@ describe("pushCommand v2", () => {
       },
       collector: {
         name: "ccusage",
-        version: "20.0.18",
+        version: "20.0.20",
         pricing_mode: "online",
       },
     });
@@ -276,6 +276,24 @@ describe("pushCommand v2", () => {
     expect(removeBatchMock).toHaveBeenCalledWith(body.request_id);
     expect(updateConfigMock).toHaveBeenCalled();
     expect(releaseMock).toHaveBeenCalled();
+  });
+
+  it.each([
+    { agents: ["gemini"] }, { agents: ["qwen"] }, { agents: ["grok"] },
+    { agents: ["gemini", "grok", "qwen"] },
+  ])("submits $agents usage without Claude or Codex", async ({ agents }) => {
+    const entry = usageEntry();
+    entry.agents = agents;
+    entry.agentBreakdown = agents.map((agent) => ({ ...entry.agentBreakdown[0], agent }));
+    const output = collected([entry]);
+    output.agents = agents;
+    output.collector.ccusage_agents = agents;
+    collectMock.mockResolvedValue(output);
+    expect(await pushCommand({})).toBe(CLI_EXIT.OK);
+    const submitCall = apiRequestMock.mock.calls.find(([, path]) => path === "/api/usage/submit")!;
+    const body = JSON.parse(submitCall[2].body);
+    expect(body.entries[0].agents.map((row: { agent: string }) => row.agent)).toEqual(agents);
+    expect(body.collector).toMatchObject({ name: "ccusage", version: "20.0.20", pricing_mode: "online" });
   });
 
   it("retries only failed dates with the same request id", async () => {

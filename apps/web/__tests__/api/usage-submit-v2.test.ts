@@ -28,6 +28,7 @@ vi.mock("@/lib/analytics/server", () => ({
   captureServerActivationEvent: vi.fn().mockResolvedValue(true),
 }));
 
+import ALL_BUILT_IN_CCUSAGE_AGENTS from "../../../../packages/cli/__tests__/fixtures/ccusage-sources.json";
 import { POST } from "@/app/api/usage/submit/route";
 import { resetRateLimiters } from "@/lib/rate-limit";
 
@@ -116,6 +117,17 @@ beforeEach(() => {
 });
 
 describe("POST /api/usage/submit protocol v2", () => {
+  it.each([...ALL_BUILT_IN_CCUSAGE_AGENTS, "custom-agent"])("accepts %s as a partitioned source", async (source) => {
+    const body = requestBody();
+    body.collector.version = "20.0.20";
+    body.entries[0].agents[0].agent = source;
+    const response = await POST(request(body));
+    expect(response.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("submit_usage_day_v2", expect.objectContaining({
+      p_entry: expect.objectContaining({ agents: [expect.objectContaining({ agent: source })] }),
+    }));
+  });
+
   it("returns an outcome for every date when a queued date expires", async () => {
     const body = requestBody();
     const expired = "2000-01-01";
