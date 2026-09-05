@@ -194,10 +194,6 @@ async function discoverDirect(origin: URL, fetch: FaviconFetch, cancel: () => vo
   if (rootIcon?.format === "svg") return rootIcon;
 
   const declared = html?.kind === "document" ? html.html : { icons: [], manifests: [] };
-  const manifests = await pairs(declared.manifests, async (url) => {
-    const response = await get(url, DOCUMENT_BYTES);
-    return response?.kind === "document" ? response.manifest : [];
-  });
   const choose = async (items: Candidate[]) => {
     let raster: { icon: PreparedFavicon; candidate: Candidate } | null = null;
     const ranked = rank(items).slice(0, MAX_CANDIDATES);
@@ -217,6 +213,13 @@ async function discoverDirect(origin: URL, fetch: FaviconFetch, cancel: () => vo
     }
     return raster?.icon ?? null;
   };
+  const declaredSvg = await choose(declared.icons.filter((icon) => icon.svg));
+  if (declaredSvg?.format === "svg") return declaredSvg;
+
+  const manifests = await pairs(declared.manifests, async (url) => {
+    const response = await get(url, DOCUMENT_BYTES);
+    return response?.kind === "document" ? response.manifest : [];
+  });
   const declaredIcon = await choose([...declared.icons, ...manifests.flat()]);
   if (declaredIcon) return declaredIcon;
   if (rootIcon) return rootIcon;

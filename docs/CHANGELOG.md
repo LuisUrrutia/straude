@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **Do not delay declared SVG icons behind manifests.** Try known HTML SVG candidates first and return a usable vector without waiting for manifest downloads. Mislabeled raster results remain available while checking for a real SVG.
+
 - **Bound favicon download memory.** Direct requests share a 12 MiB body budget; the Google fallback has a separate 4 MiB allowance. Per-search deduplication stores prepared images and parsed candidates instead of keeping discarded image bodies alive.
 
 - **Bound HTML favicon parsing.** Extract links without constructing an untrusted document DOM, with token and parsing-time limits. Deeply nested pages no longer overflow the stack or prevent the Google fallback.

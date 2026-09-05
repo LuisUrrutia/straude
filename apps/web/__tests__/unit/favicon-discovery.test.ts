@@ -75,6 +75,36 @@ describe("favicon discovery", () => {
     expect(fixture.peak()).toBe(2);
   });
 
+  it("returns a declared SVG without waiting for a stalled manifest", async () => {
+    const fetch = vi.fn(async (url: URL): Promise<FaviconResponse | null> => {
+      if (url.pathname === "/") return response('<link rel="icon" href="/brand.svg"><link rel="manifest" href="/stalled.json">');
+      if (url.pathname === "/brand.svg") return response(vector, url.href);
+      if (url.pathname === "/stalled.json") return new Promise(() => {});
+      return null;
+    });
+    const cancel = vi.fn();
+
+    const result = await discoverWithFetch(origin, fetch, cancel);
+
+    expect(result?.format).toBe("svg");
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(fetch.mock.calls.map(([url]) => url.pathname)).toEqual(["/favicon.svg", "/", "/brand.svg"]);
+  }, 1000);
+
+  it("keeps a mislabeled SVG's PNG result while looking for a real manifest SVG", async () => {
+    const png = await sharp({ create: { width: 16, height: 16, channels: 4, background: "red" } }).png().toBuffer();
+    const fixture = site({
+      "/": '<link rel="icon" href="/actually-png.svg"><link rel="manifest" href="/app.json">',
+      "/actually-png.svg": png,
+      "/app.json": JSON.stringify({ icons: [{ src: "/real.svg" }] }),
+      "/real.svg": vector,
+    });
+
+    expect((await discoverWithFetch(origin, fixture.fetch))?.format).toBe("svg");
+    expect(fixture.paths().filter((url) => url.endsWith("/actually-png.svg"))).toHaveLength(1);
+    expect(fixture.peak()).toBeLessThanOrEqual(2);
+  });
+
   it("prefers a delayed declared manifest SVG over a fast declared PNG", async () => {
     const png = await sharp({ create: { width: 256, height: 256, channels: 4, background: "red" } }).png().toBuffer();
     const fixture = site({ "/": '<link rel="icon" href="fast.png"><link rel="manifest" href="/app/manifest.json">', "/fast.png": png,
