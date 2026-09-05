@@ -32,6 +32,10 @@ vi.mock("@/lib/supabase/service", () => ({
   getServiceClient: vi.fn(() => mockServiceSupabase),
 }));
 
+vi.mock("@/lib/rate-limit", () => ({
+  rateLimit: vi.fn().mockResolvedValue(null),
+}));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
