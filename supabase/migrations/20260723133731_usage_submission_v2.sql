@@ -33,7 +33,7 @@ ALTER TABLE public.usage_installation_aliases ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.usage_installation_aliases FROM PUBLIC;
 REVOKE ALL ON TABLE public.usage_installation_aliases FROM anon;
 REVOKE ALL ON TABLE public.usage_installation_aliases FROM authenticated;
-GRANT SELECT, INSERT, UPDATE ON TABLE public.usage_installation_aliases TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.usage_installation_aliases TO service_role;
 
 -- Preserve the original installation creation order so deterministic repairs
 -- can choose the earliest known installation as canonical.
@@ -179,7 +179,7 @@ ALTER TABLE public.usage_submission_outcomes ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.usage_submission_outcomes FROM PUBLIC;
 REVOKE ALL ON TABLE public.usage_submission_outcomes FROM anon;
 REVOKE ALL ON TABLE public.usage_submission_outcomes FROM authenticated;
-GRANT SELECT, INSERT, UPDATE ON TABLE public.usage_submission_outcomes TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.usage_submission_outcomes TO service_role;
 
 CREATE OR REPLACE FUNCTION public.submit_usage_day_v2(
   p_user_id UUID,

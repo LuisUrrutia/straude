@@ -113,7 +113,8 @@ select public.rollback_usage_repair_batch('<batch-uuid>');
 
 Do not edit ledger rows or manually merge candidates. Use `straude devices
 merge <candidate>` or `straude devices keep-separate <candidate>` for ambiguous
-user-owned decisions.
+user-owned decisions. Merge is rejected when overlapping snapshots differ; use
+`keep-separate` to preserve both devices without redirecting their future syncs.
 
 ## Audit closure
 

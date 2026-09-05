@@ -35,6 +35,11 @@ CREATE TABLE public.usage_device_reconciliation_decisions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE INDEX usage_device_decisions_candidate_idx
+  ON public.usage_device_reconciliation_decisions(candidate_id);
+CREATE INDEX usage_device_decisions_user_idx
+  ON public.usage_device_reconciliation_decisions(user_id);
+
 CREATE TABLE public.usage_repair_batches (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   reason TEXT NOT NULL CHECK (char_length(reason) BETWEEN 1 AND 500),
@@ -72,6 +77,9 @@ CREATE TABLE public.usage_corrections_ledger (
 CREATE INDEX usage_corrections_ledger_batch_idx
   ON public.usage_corrections_ledger(batch_id, id);
 
+CREATE INDEX usage_corrections_ledger_user_idx
+  ON public.usage_corrections_ledger(user_id);
+
 ALTER TABLE public.usage_device_reconciliation_candidates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.usage_device_reconciliation_decisions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.usage_repair_batches ENABLE ROW LEVEL SECURITY;
@@ -81,10 +89,10 @@ REVOKE ALL ON TABLE public.usage_device_reconciliation_candidates FROM PUBLIC, a
 REVOKE ALL ON TABLE public.usage_device_reconciliation_decisions FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.usage_repair_batches FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.usage_corrections_ledger FROM PUBLIC, anon, authenticated;
-GRANT SELECT, INSERT, UPDATE ON TABLE public.usage_device_reconciliation_candidates TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.usage_device_reconciliation_candidates TO service_role;
 GRANT SELECT, INSERT, DELETE ON TABLE public.usage_device_reconciliation_decisions TO service_role;
 GRANT SELECT, INSERT, UPDATE ON TABLE public.usage_repair_batches TO service_role;
-GRANT SELECT, INSERT, UPDATE ON TABLE public.usage_corrections_ledger TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.usage_corrections_ledger TO service_role;
 GRANT USAGE, SELECT ON SEQUENCE public.usage_corrections_ledger_id_seq TO service_role;
 GRANT DELETE ON TABLE public.device_usage TO service_role;
 
@@ -128,6 +136,11 @@ AS $function$
 DECLARE
   v_inserted INTEGER;
 BEGIN
+  -- Reconciliation can nest discovery and resolution. Take one maintenance
+  -- lock before row locks to avoid inversions; ordinary syncs do not take it.
+  PERFORM pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended('usage-reconciliation', 0)
+  );
   INSERT INTO public.usage_installation_aliases (
     device_id, user_id, canonical_device_id, name
   )
@@ -306,9 +319,15 @@ DECLARE
   v_decision_id UUID;
   v_owned_batch BOOLEAN := false;
 BEGIN
+  -- Reconciliation can nest discovery and resolution. Take one maintenance
+  -- lock before row locks to avoid inversions; ordinary syncs do not take it.
+  PERFORM pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended('usage-reconciliation', 0)
+  );
   IF p_decision NOT IN ('merge', 'keep_separate') THEN
     RAISE EXCEPTION 'invalid reconciliation decision' USING ERRCODE = '22023';
   END IF;
+
 
   SELECT *
   INTO v_candidate
@@ -331,6 +350,15 @@ BEGIN
     );
   END IF;
 
+  IF EXISTS (
+    SELECT 1 FROM public.usage_installation_aliases
+    WHERE user_id = p_user_id
+      AND device_id IN (v_candidate.device_id_a, v_candidate.device_id_b)
+      AND canonical_device_id NOT IN (v_candidate.device_id_a, v_candidate.device_id_b)
+  ) THEN
+    RAISE EXCEPTION 'candidate identity already resolved' USING ERRCODE = 'P0002';
+  END IF;
+
   SELECT alias.canonical_device_id
   INTO v_canonical
   FROM public.usage_installation_aliases AS alias
@@ -344,6 +372,58 @@ BEGIN
       THEN v_candidate.device_id_b
     ELSE v_candidate.device_id_a
   END;
+
+  -- Pending candidates quarantine both devices from new submissions. Lock the
+  -- existing rows before checking proof, and reject before changing any alias
+  -- or ledger: one identity cannot retain divergent copies of the same date.
+  PERFORM 1 FROM public.usage_agent_daily
+  WHERE user_id = p_user_id AND device_id IN (v_canonical, v_other)
+  ORDER BY date, device_id, agent FOR UPDATE;
+  PERFORM 1 FROM public.device_usage
+  WHERE user_id = p_user_id AND device_id IN (v_canonical, v_other)
+  ORDER BY date, device_id FOR UPDATE;
+
+  IF EXISTS (
+    SELECT 1
+    FROM public.device_usage AS canonical
+    JOIN public.device_usage AS other
+      ON other.user_id = canonical.user_id AND other.date = canonical.date
+      AND other.device_id = v_other
+    LEFT JOIN LATERAL (
+      SELECT jsonb_agg(to_jsonb(rows) - ARRAY[
+        'user_id', 'date', 'device_id', 'content_hash', 'migration_id', 'created_at', 'updated_at'
+      ] ORDER BY rows.agent) AS fingerprint
+      FROM public.usage_agent_daily AS rows
+      WHERE rows.user_id = p_user_id AND rows.date = canonical.date
+        AND rows.device_id = v_canonical
+    ) AS canonical_agents ON true
+    LEFT JOIN LATERAL (
+      SELECT jsonb_agg(to_jsonb(rows) - ARRAY[
+        'user_id', 'date', 'device_id', 'content_hash', 'migration_id', 'created_at', 'updated_at'
+      ] ORDER BY rows.agent) AS fingerprint
+      FROM public.usage_agent_daily AS rows
+      WHERE rows.user_id = p_user_id AND rows.date = canonical.date
+        AND rows.device_id = v_other
+    ) AS other_agents ON true
+    WHERE canonical.user_id = p_user_id AND canonical.device_id = v_canonical
+      AND (
+        canonical_agents.fingerprint IS NULL OR other_agents.fingerprint IS NULL
+        OR canonical_agents.fingerprint IS DISTINCT FROM other_agents.fingerprint
+        OR jsonb_build_array(
+          canonical.cost_usd, canonical.input_tokens, canonical.output_tokens,
+          canonical.reasoning_output_tokens, canonical.cache_creation_tokens,
+          canonical.cache_read_tokens, canonical.total_tokens,
+          canonical.models, canonical.model_breakdown
+        ) IS DISTINCT FROM jsonb_build_array(
+          other.cost_usd, other.input_tokens, other.output_tokens,
+          other.reasoning_output_tokens, other.cache_creation_tokens,
+          other.cache_read_tokens, other.total_tokens, other.models, other.model_breakdown
+        )
+      )
+  ) THEN
+    RAISE EXCEPTION 'Devices have divergent overlapping usage; keep them separate'
+      USING ERRCODE = '23000';
+  END IF;
 
   v_batch := NULLIF(
     pg_catalog.current_setting('straude.usage_repair_batch_id', true), ''
@@ -698,6 +778,11 @@ DECLARE
   v_candidate RECORD;
   v_processed INTEGER := 0;
 BEGIN
+  -- Reconciliation can nest discovery and resolution. Take one maintenance
+  -- lock before row locks to avoid inversions; ordinary syncs do not take it.
+  PERFORM pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended('usage-reconciliation', 0)
+  );
   IF p_limit < 1 OR p_limit > 500 THEN
     RAISE EXCEPTION 'invalid repair batch limit' USING ERRCODE = '22023';
   END IF;
@@ -971,6 +1056,11 @@ DECLARE
   v_entry RECORD;
   v_restored INTEGER := 0;
 BEGIN
+  -- Reconciliation can nest discovery and resolution. Take one maintenance
+  -- lock before row locks to avoid inversions; ordinary syncs do not take it.
+  PERFORM pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended('usage-reconciliation', 0)
+  );
   IF NOT EXISTS (
     SELECT 1 FROM public.usage_repair_batches
     WHERE id = p_batch_id AND status = 'completed'

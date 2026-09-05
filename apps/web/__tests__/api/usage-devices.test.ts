@@ -204,6 +204,19 @@ describe("POST /api/usage/devices/resolve", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
+  it("returns actionable 409 guidance when overlapping device usage differs", async () => {
+    webSession("web-user");
+    rpc.mockResolvedValue({ data: null, error: { code: "23000", message: "divergent usage" } });
+    const response = await POST(new Request("http://localhost/api/usage/devices/resolve", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ candidate_id: CANDIDATE_ID, decision: "merge" }),
+    }));
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: {
+      code: "device_usage_conflict", message: expect.stringContaining(`straude devices keep-separate ${CANDIDATE_ID}`),
+    } });
+  });
+
   it("maps an inaccessible candidate to a stable 404 response", async () => {
     webSession("web-user");
     rpc.mockResolvedValue({

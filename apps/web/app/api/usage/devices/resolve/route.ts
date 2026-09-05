@@ -131,6 +131,12 @@ export async function POST(request: Request): Promise<NextResponse> {
   );
   const headers = usageDevicesHeaders(auth);
   if (error) {
+    if (error.code === "23000") {
+      return NextResponse.json({ error: {
+        code: "device_usage_conflict",
+        message: `These devices have different usage on the same date. Run straude devices keep-separate ${parsed.value.candidate_id}.`,
+      } }, { status: 409, headers });
+    }
     const notFound = error.code === "P0002";
     return NextResponse.json(
       {

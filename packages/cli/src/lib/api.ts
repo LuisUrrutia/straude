@@ -205,8 +205,10 @@ async function errorForResponse(
       response,
       prepared.deadlineAt,
       prepared.timeoutMs,
-    ) as { error?: string };
-    if (body.error) message = body.error;
+    ) as { error?: unknown };
+    if (typeof body.error === "string") message = body.error;
+    else if (body.error && typeof body.error === "object" && "message" in body.error
+      && typeof body.error.message === "string") message = body.error.message;
   } catch (error) {
     if (error instanceof ApiTimeoutError) throw error;
     // Preserve the status fallback when the error body is not JSON.

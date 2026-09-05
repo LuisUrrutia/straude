@@ -459,7 +459,48 @@ describe("POST /api/usage/submit (real Supabase)", () => {
     });
   });
 
-  it("merges an ambiguous identity without dropping divergent overlapping usage", async () => {
+  it("orders discovery and manual resolution locks without a deadlock", async () => {
+    const userId = await insertUser(db, { username: "v2_lock_order" });
+    const otherDevice = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+    await db.query(
+      `INSERT INTO public.usage_installation_aliases (user_id, device_id, canonical_device_id, name)
+       VALUES ($1, $2, $2, 'same-host'), ($1, $3, $3, 'same-host')`,
+      [userId, DEVICE_ID, otherDevice],
+    );
+    await db.query("SELECT public.discover_usage_device_candidates($1)", [userId]);
+    const candidate = await db.query<{ id: string }>(
+      "SELECT id FROM public.usage_device_reconciliation_candidates WHERE user_id = $1", [userId],
+    );
+    const concurrent = await openTestDb();
+    let pending: Promise<unknown> | undefined;
+    try {
+      const backend = await concurrent.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
+      await db.query("BEGIN");
+      await db.query("SET LOCAL statement_timeout = '3s'");
+      await db.query("SELECT public.discover_usage_device_candidates($1)", [userId]);
+      pending = concurrent.query(
+        "SELECT public.resolve_usage_device_candidate($1, $2, 'keep_separate')",
+        [userId, candidate.rows[0].id],
+      ).catch((error: { code: string }) => error.code);
+      await expect.poll(async () => {
+        const waiting = await db.query("SELECT wait_event_type FROM pg_stat_activity WHERE pid = $1", [backend.rows[0].pid]);
+        return waiting.rows[0]?.wait_event_type;
+      }).toBe("Lock");
+      // A repair resolves after discovery in the same transaction. The competing
+      // manual request must wait before holding any candidate row or user lock.
+      await db.query("SELECT public.resolve_usage_device_candidate($1, $2, 'keep_separate')", [userId, candidate.rows[0].id]);
+      await db.query("COMMIT");
+      expect(await pending).toBe("P0002");
+      const decisions = await db.query("SELECT count(*)::int AS n FROM public.usage_device_reconciliation_decisions WHERE user_id = $1", [userId]);
+      expect(decisions.rows[0].n).toBe(1);
+    } finally {
+      await db.query("ROLLBACK");
+      if (pending) await pending;
+      await concurrent.end();
+    }
+  });
+
+  it("rejects an ambiguous merge without changing divergent usage, aliases, or the ledger", async () => {
     const userId = await insertUser(db, { username: "v2_ambiguous_merge" });
     const deviceA = "30000000-0000-4000-8000-000000000003";
     const deviceB = "40000000-0000-4000-8000-000000000004";
@@ -552,10 +593,19 @@ describe("POST /api/usage/submit (real Supabase)", () => {
     );
     expect(candidate.rows[0]!.status).toBe("ambiguous");
 
-    await db.query(
+    const state = () => db.query(`SELECT jsonb_build_object(
+      'agents', (SELECT jsonb_agg(to_jsonb(rows) ORDER BY device_id) FROM public.usage_agent_daily rows WHERE user_id = $1),
+      'devices', (SELECT jsonb_agg(to_jsonb(rows) ORDER BY device_id) FROM public.device_usage rows WHERE user_id = $1),
+      'aliases', (SELECT jsonb_agg(to_jsonb(rows) ORDER BY device_id) FROM public.usage_installation_aliases rows WHERE user_id = $1),
+      'candidate', (SELECT to_jsonb(rows) FROM public.usage_device_reconciliation_candidates rows WHERE user_id = $1),
+      'ledger', (SELECT count(*) FROM public.usage_corrections_ledger WHERE user_id = $1)
+    ) AS state`, [userId]);
+    const before = await state();
+    await expect(db.query(
       "SELECT public.resolve_usage_device_candidate($1, $2, 'merge')",
       [userId, candidate.rows[0]!.id],
-    );
+    )).rejects.toMatchObject({ code: "23000" });
+    expect((await state()).rows).toEqual(before.rows);
     const merged = await db.query(
       `SELECT
          (SELECT count(*)::int FROM public.usage_agent_daily WHERE user_id = $1) AS agents,
@@ -575,8 +625,8 @@ describe("POST /api/usage/submit (real Supabase)", () => {
       agent_tokens: 480,
       devices: 2,
       daily_tokens: 480,
-      canonical_aliases: 2,
-      candidate_status: "merged",
+      canonical_aliases: 1,
+      candidate_status: "ambiguous",
     });
     expect(Number(merged.rows[0].agent_cost)).toBeCloseTo(0.75, 6);
     expect(Number(merged.rows[0].daily_cost)).toBeCloseTo(0.75, 6);
@@ -872,6 +922,55 @@ describe("POST /api/usage/submit (real Supabase)", () => {
     });
   });
 
+  it("erases owned v2 state with service credentials while preserving aggregate usage and other accounts", async () => {
+    const userId = await insertUser(db, { username: "v2_delete" });
+    const otherId = await insertUser(db, { username: "v2_preserve" });
+    for (const [id, username] of [[userId, "v2_delete"], [otherId, "v2_preserve"]]) {
+      const response = await callSubmit(v2Body(`delete-${id}`, "a".repeat(64)), await mintCliToken(id, username));
+      expect(response.status).toBe(200);
+    }
+    const candidate = await db.query<{ id: string }>(
+      `INSERT INTO public.usage_device_reconciliation_candidates (
+        user_id, device_id_a, device_id_b, normalized_hostname, status
+      ) VALUES ($1, $2, 'ffffffff-ffff-4fff-8fff-ffffffffffff', 'private-host', 'kept_separate') RETURNING id`,
+      [userId, DEVICE_ID],
+    );
+    await db.query(
+      "INSERT INTO public.usage_device_reconciliation_decisions (user_id, candidate_id, decision) VALUES ($1, $2, 'keep_separate')",
+      [userId, candidate.rows[0].id],
+    );
+    const batch = await db.query<{ id: string }>(
+      "INSERT INTO public.usage_repair_batches (reason) VALUES ('shared repair batch') RETURNING id",
+    );
+    await db.query(
+      `INSERT INTO public.usage_corrections_ledger (batch_id, user_id, reason, table_name, row_key, before_row)
+       VALUES ($1, $2, 'repair', 'usage_installation_aliases', '{}'::jsonb, '{"name":"private-host"}'::jsonb)`,
+      [batch.rows[0].id, userId],
+    );
+    const { getServiceClient } = await import("@/lib/supabase/service");
+    const service = getServiceClient();
+    // Match account deletion's FK order: decisions must disappear before candidates.
+    const ownedTables = [
+      "device_usage", "usage_installation_aliases", "usage_agent_daily",
+      "usage_submission_outcomes", "usage_device_reconciliation_decisions",
+      "usage_corrections_ledger",
+    ];
+    for (const table of [...ownedTables, "usage_device_reconciliation_candidates"]) {
+      const result = await service.from(table).delete().eq("user_id", userId);
+      expect(result.error, table).toBeNull();
+      const remaining = await db.query(`SELECT count(*)::int AS n FROM public.${table} WHERE user_id = $1`, [userId]);
+      expect(remaining.rows[0].n, table).toBe(0);
+    }
+    const preserved = await db.query(
+      `SELECT
+        (SELECT count(*)::int FROM public.daily_usage WHERE user_id = $1) AS aggregate_rows,
+        (SELECT count(*)::int FROM public.usage_agent_daily WHERE user_id = $2) AS other_agent_rows,
+        (SELECT count(*)::int FROM public.usage_repair_batches WHERE id = $3) AS shared_batches`,
+      [userId, otherId, batch.rows[0].id],
+    );
+    expect(preserved.rows[0]).toEqual({ aggregate_rows: 1, other_agent_rows: 1, shared_batches: 1 });
+  });
+
   it("keeps v2 tables and RPC private to service_role", async () => {
     const grants = await db.query(
       `SELECT grantee, privilege_type, table_name
@@ -882,6 +981,8 @@ describe("POST /api/usage/submit (real Supabase)", () => {
            'usage_agent_daily',
            'usage_submission_outcomes',
            'usage_device_reconciliation_decisions',
+           'usage_device_reconciliation_candidates',
+           'usage_repair_batches',
            'usage_corrections_ledger',
            'device_usage'
          )
@@ -895,13 +996,19 @@ describe("POST /api/usage/submit (real Supabase)", () => {
     expect(grantedRoles).toContain("service_role");
     expect(grantedRoles).not.toContain("anon");
     expect(grantedRoles).not.toContain("authenticated");
-    const privileges = new Set(grants.rows.map(
+    const privileges = new Set(grants.rows.filter((row) => row.grantee === "service_role").map(
       (row) => `${row.table_name}:${row.privilege_type}`,
     ));
     expect(privileges).toContain("usage_submission_outcomes:UPDATE");
     expect(privileges).toContain("usage_corrections_ledger:UPDATE");
     expect(privileges).toContain("usage_device_reconciliation_decisions:DELETE");
-    expect(privileges).toContain("device_usage:DELETE");
+    for (const table of [
+      "device_usage", "usage_installation_aliases", "usage_agent_daily",
+      "usage_submission_outcomes", "usage_device_reconciliation_candidates",
+      "usage_device_reconciliation_decisions", "usage_corrections_ledger",
+    ]) {
+      expect(privileges).toContain(`${table}:DELETE`);
+    }
     const rls = await db.query(
       `SELECT relname, relrowsecurity
        FROM pg_class
@@ -910,21 +1017,32 @@ describe("POST /api/usage/submit (real Supabase)", () => {
          AND relname IN (
            'usage_installation_aliases',
            'usage_agent_daily',
-           'usage_submission_outcomes'
+           'usage_submission_outcomes',
+           'usage_device_reconciliation_candidates',
+           'usage_device_reconciliation_decisions',
+           'usage_repair_batches',
+           'usage_corrections_ledger'
          )`,
     );
-    expect(rls.rows).toHaveLength(3);
+    expect(rls.rows).toHaveLength(7);
     expect(rls.rows.every((row) => row.relrowsecurity)).toBe(true);
     const functionGrants = await db.query(
-      `SELECT grantee
+      `SELECT grantee, routine_name
        FROM information_schema.routine_privileges
        WHERE specific_schema = 'public'
-         AND routine_name = 'submit_usage_day_v2'`,
+         AND routine_name IN (
+           'usage_web_installation_id', 'submit_usage_day_v2',
+           'list_usage_device_candidates', 'discover_usage_device_candidates',
+           'resolve_usage_device_candidate', 'start_usage_repair_batch',
+           'run_usage_repair_batch', 'rollback_usage_repair_batch'
+         )`,
     );
     const functionRoles = new Set(functionGrants.rows.map((row) => row.grantee));
     expect(functionRoles).toContain("service_role");
     expect(functionRoles).not.toContain("anon");
     expect(functionRoles).not.toContain("authenticated");
+    expect(functionRoles).not.toContain("PUBLIC");
+    expect(new Set(functionGrants.rows.filter((row) => row.grantee === "service_role").map((row) => row.routine_name)).size).toBe(8);
   });
 
   it("rejects unauthenticated requests without writing anything", async () => {

@@ -186,6 +186,15 @@ describe("apiRequest — error handling", () => {
     await expect(apiRequest(configFor(), "/api/test", { maxRetries: 0 })).rejects.toThrow("HTTP 503");
   });
 
+  it("surfaces structured API recovery instructions", async () => {
+    plan.push({ status: 409, body: { error: {
+      code: "device_usage_conflict", message: "Run straude devices keep-separate candidate-id.",
+    } } });
+    await expect(apiRequest(configFor(), "/api/usage/devices/resolve", {
+      method: "POST", body: "{}", maxRetries: 0,
+    })).rejects.toThrow("Run straude devices keep-separate candidate-id.");
+  });
+
   it("returns typed protocol bodies for explicitly accepted non-2xx statuses", async () => {
     plan.push({
       status: 409,
