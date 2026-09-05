@@ -10,7 +10,8 @@ function candidate({ raw, base, type = "", sizes = "", purpose = 0, media = 0 }:
   raw: string; base: URL; type?: string; sizes?: string; purpose?: number; media?: number;
 }): Candidate | null {
   const url = publicHttpUrl(raw, base);
-  if (!url) return null;
+  if (!url || url.pathname.toLowerCase().endsWith(".ico")) return null;
+  if (["image/x-icon", "image/vnd.microsoft.icon"].includes(type.toLowerCase().split(";")[0].trim())) return null;
   const dimensions = sizes.toLowerCase().split(/\s+/).slice(0, 32).map((size) => {
     const match = /^(\d+)x(\d+)$/.exec(size);
     return match ? Math.min(Number(match[1]), Number(match[2])) : 0;
@@ -97,14 +98,38 @@ export async function discoverFavicon(origin: URL, signal?: AbortSignal): Promis
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 5000);
   try {
-    return await discoverWithFetch(origin, createPublicFetch(signal ? AbortSignal.any([signal, controller.signal]) : controller.signal), () => controller.abort());
+    return await discoverWithFetch(
+      origin,
+      createPublicFetch(signal ? AbortSignal.any([signal, controller.signal]) : controller.signal),
+      () => controller.abort(),
+      (url, limit) => {
+        const deadline = AbortSignal.timeout(2000);
+        return createPublicFetch(signal ? AbortSignal.any([signal, deadline]) : deadline)(url, limit);
+      },
+    );
   } finally {
     controller.abort();
     clearTimeout(timer);
   }
 }
 
-export async function discoverWithFetch(origin: URL, fetch: FaviconFetch, cancel: () => void = () => {}): Promise<PreparedFavicon | null> {
+export async function discoverWithFetch(
+  origin: URL,
+  fetch: FaviconFetch,
+  cancel: () => void = () => {},
+  fallbackFetch: FaviconFetch = fetch,
+): Promise<PreparedFavicon | null> {
+  const direct = await discoverDirect(origin, fetch, cancel);
+  if (direct) return direct;
+  const google = new URL("https://www.google.com/s2/favicons");
+  google.searchParams.set("domain", origin.hostname.toLowerCase());
+  google.searchParams.set("sz", "128");
+  const response = await fallbackFetch(google, MAX_ICON_BYTES).catch(() => null);
+  const icon = response ? await prepareFavicon(response.bytes) : null;
+  return icon?.format === "png" ? icon : null;
+}
+
+async function discoverDirect(origin: URL, fetch: FaviconFetch, cancel: () => void): Promise<PreparedFavicon | null> {
   const fetched = new Map<string, Promise<FaviconResponse | null>>();
   const get = (url: URL, limit: number) => {
     let pending = fetched.get(url.href);
@@ -164,5 +189,5 @@ export async function discoverWithFetch(origin: URL, fetch: FaviconFetch, cancel
   if (conventionalIcon) return conventionalIcon;
   const png = conventional.find(({ path }) => path === "/favicon.png")?.response;
   const prepared = png ? await prepareFavicon(png.bytes) : null;
-  return prepared ?? image(new URL("/favicon.ico", origin));
+  return prepared;
 }

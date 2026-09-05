@@ -50,6 +50,7 @@ describe("favicon discovery", () => {
       "/app/manifest.json": JSON.stringify({ icons: [{ src: "icon.svg", purpose: "any" }] }), "/app/icon.svg": vector });
     expect((await discoverWithFetch(origin, fixture.fetch))?.format).toBe("svg");
     expect(fixture.paths()).not.toContain("https://example.com/favicon.png");
+    expect(fixture.paths().some((url) => url.startsWith("https://www.google.com/"))).toBe(false);
     expect(fixture.peak()).toBeLessThanOrEqual(2);
   });
 
@@ -60,13 +61,61 @@ describe("favicon discovery", () => {
     expect(await discoverWithFetch(origin, fixture.fetch)).toMatchObject({ format: "png", width: 128, height: 64 });
   });
 
-  it("checks conventional manifests before accepting favicon.png and leaves ICO last", async () => {
+  it("checks conventional manifests before accepting favicon.png and uses Google last", async () => {
     const fixture = site({ "/manifest.webmanifest": JSON.stringify({ icons: [{ src: "/brand.svg" }] }), "/brand.svg": vector });
     expect((await discoverWithFetch(origin, fixture.fetch))?.format).toBe("svg");
     expect(fixture.paths()).not.toContain("https://example.com/favicon.ico");
     const empty = site({});
     expect(await discoverWithFetch(origin, empty.fetch)).toBeNull();
-    expect(empty.paths().at(-1)).toBe("https://example.com/favicon.ico");
+    expect(empty.paths().at(-1)).toBe("https://www.google.com/s2/favicons?domain=example.com&sz=128");
+    expect(empty.paths()).not.toContain("https://example.com/favicon.ico");
+  });
+
+  it("skips ICO links and normalizes a Google fallback after direct discovery fails", async () => {
+    const png = await sharp({ create: { width: 256, height: 128, channels: 4, background: "blue" } }).png().toBuffer();
+    const fixture = site({
+      "/": '<link rel="icon" href="/favicon.ico"><link rel="icon" href="/opaque" type="image/x-icon"><link rel="manifest" href="/app.json">',
+      "/app.json": JSON.stringify({ icons: [{ src: "/manifest.ico" }, { src: "/opaque-icon", type: "image/vnd.microsoft.icon" }] }),
+      "https://www.google.com/s2/favicons?domain=example.com&sz=128": png,
+    });
+
+    const result = await discoverWithFetch(origin, fixture.fetch);
+
+    expect(result).toMatchObject({ format: "png", width: 128, height: 64 });
+    expect((await sharp(result!.bytes).metadata()).format).toBe("png");
+    expect(fixture.paths().at(-1)).toBe("https://www.google.com/s2/favicons?domain=example.com&sz=128");
+    expect(fixture.paths().some((url) => /\.ico$|\/opaque/.test(url))).toBe(false);
+  });
+
+  it("does not call Google when a direct PNG is usable", async () => {
+    const png = await sharp({ create: { width: 16, height: 16, channels: 4, background: "red" } }).png().toBuffer();
+    const fixture = site({ "/favicon.png": png });
+
+    expect((await discoverWithFetch(origin, fixture.fetch))?.format).toBe("png");
+    expect(fixture.paths().some((url) => url.startsWith("https://www.google.com/"))).toBe(false);
+  });
+
+  it("can use an independent fallback transport after direct requests abort", async () => {
+    const direct = vi.fn(async () => { throw new DOMException("Timed out", "AbortError"); });
+    const png = await sharp({ create: { width: 16, height: 16, channels: 4, background: "red" } }).png().toBuffer();
+    const fallback = vi.fn(async () => response(png));
+
+    const result = await discoverWithFetch(origin, direct, () => {}, fallback);
+
+    expect(result?.format).toBe("png");
+    expect(fallback).toHaveBeenCalledExactlyOnceWith(new URL("https://www.google.com/s2/favicons?domain=example.com&sz=128"), 4 * 1024 * 1024);
+  });
+
+  it.each([Buffer.from("not an image"), vector, Buffer.alloc(4 * 1024 * 1024 + 1)])("rejects invalid Google image responses", async (bytes) => {
+    const fixture = site({ "https://www.google.com/s2/favicons?domain=example.com&sz=128": bytes });
+    expect(await discoverWithFetch(origin, fixture.fetch)).toBeNull();
+  });
+
+  it("returns no icon if both discovery and Google fail", async () => {
+    const fixture = site({});
+    const fallback = vi.fn(async () => { throw new Error("Google unavailable"); });
+    expect(await discoverWithFetch(origin, fixture.fetch, () => {}, fallback)).toBeNull();
+    expect(fallback).toHaveBeenCalledOnce();
   });
 
   it("bounds declared candidates, deduplicates requests and ignores Open Graph images", async () => {

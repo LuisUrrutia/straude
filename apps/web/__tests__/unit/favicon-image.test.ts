@@ -74,27 +74,9 @@ describe("favicon normalization", () => {
     ]) expect(await prepareFavicon(bytes)).toBeNull();
   });
 
-  it("decodes PNG-backed ICO entries", async () => {
+  it("rejects ICO containers even when their embedded image is PNG", async () => {
     const png = await sharp({ create: { width: 32, height: 32, channels: 4, background: "red" } }).png().toBuffer();
-    const result = await prepareFavicon(ico(png, 32));
-    expect(result).toMatchObject({ format: "png", width: 32, height: 32 });
-    expect(await sharp(result!.bytes).raw().toBuffer()).toEqual(await sharp(png).raw().toBuffer());
-  });
-
-  it("decodes BMP-backed ICO entries with transparency", async () => {
-    const dib = Buffer.alloc(40 + 16 * 16 * 4 + 16 * 4);
-    dib.writeUInt32LE(40, 0);
-    dib.writeInt32LE(16, 4);
-    dib.writeInt32LE(32, 8);
-    dib.writeUInt16LE(1, 12);
-    dib.writeUInt16LE(32, 14);
-    for (let offset = 40; offset < 40 + 16 * 16 * 4; offset += 4) {
-      dib[offset + 2] = 255;
-      dib[offset + 3] = 128;
-    }
-    const result = await prepareFavicon(ico(dib, 16));
-    expect(result).toMatchObject({ format: "png", width: 16, height: 16 });
-    expect([...((await sharp(result!.bytes).raw().toBuffer()).subarray(0, 4))]).toEqual([255, 0, 0, 128]);
+    expect(await prepareFavicon(ico(png, 32))).toBeNull();
   });
 
   it("rejects corrupt, oversized and high-pixel-count sources", async () => {

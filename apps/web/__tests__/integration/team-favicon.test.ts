@@ -17,7 +17,7 @@ vi.mock("@/lib/favicons/public-fetch", async (original) => ({
 }));
 
 const id = crypto.randomUUID();
-const domains = [0, 1, 2, 3, 4].map((index) => `favicon-${id}-${index}.example`);
+const domains = [0, 1, 2, 3, 4, 5].map((index) => `favicon-${id}-${index}.example`);
 const paths = domains.flatMap((domain) => [`${domain}.svg`, `${domain}.png`]);
 const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100"><rect width="200" height="100" fill="red" onclick="alert(1)"/></svg>');
 let db: ReturnType<typeof getServiceClient>;
@@ -86,6 +86,28 @@ describe("team favicon save with real database and Storage", () => {
     remote.fetch.mockClear();
     const legacy = await patch({ team_url: `https://${domains[2]}` });
     expect((await legacy.json()).team_favicon_url).toContain(`${domains[2]}.png`);
+    expect(remote.fetch).not.toHaveBeenCalled();
+  });
+
+  it("stores Google's fallback as PNG and reuses it without external requests", async () => {
+    const png = await sharp({ create: { width: 256, height: 128, channels: 4, background: "blue" } }).png().toBuffer();
+    remote.fetch.mockImplementation(async (url) => url.hostname === "www.google.com"
+      ? { url, bytes: png, contentType: "image/png" } : null);
+
+    const result = await patch({ team_url: `https://${domains[5]}` });
+
+    expect(result.status).toBe(200);
+    const profile = await result.json();
+    expect(profile.team_favicon_url).toContain(`/team-favicons/${domains[5]}.png`);
+    const stored = await fetch(profile.team_favicon_url);
+    expect(stored.headers.get("content-type")).toContain("image/png");
+    expect(await sharp(Buffer.from(await stored.arrayBuffer())).metadata()).toMatchObject({ width: 128, height: 64 });
+    expect(remote.fetch.mock.calls.at(-1)?.[0].href).toBe(`https://www.google.com/s2/favicons?domain=${domains[5]}&sz=128`);
+    expect((await db.from("team_favicon_cache").select("object_path,retry_after").eq("domain", domains[5]).single()).data)
+      .toEqual({ object_path: `${domains[5]}.png`, retry_after: null });
+
+    remote.fetch.mockClear();
+    expect(await resolveTeamFavicon(`https://${domains[5]}`)).toMatchObject({ teamFaviconUrl: profile.team_favicon_url });
     expect(remote.fetch).not.toHaveBeenCalled();
   });
 

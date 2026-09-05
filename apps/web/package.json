@@ -32,7 +32,6 @@
     "agentation": "^2.2.1",
     "clsx": "^2",
     "css-tree": "3.2.1",
-    "decode-ico": "0.4.1",
     "dompurify": "3.4.14",
     "heic-convert": "^2.1.0",
     "heic2any": "^0.0.4",

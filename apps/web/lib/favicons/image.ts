@@ -2,7 +2,6 @@ import createDOMPurify from "dompurify";
 import { JSDOM } from "jsdom";
 import { parse, walk, type CssNode } from "css-tree";
 import { SaxesParser } from "saxes";
-import decodeIco from "decode-ico";
 import sharp from "sharp";
 
 export const MAX_ICON_BYTES = 4 * 1024 * 1024;
@@ -86,27 +85,6 @@ function sanitizeSvg(bytes: Buffer): PreparedFavicon | null {
   }
 }
 
-function icoImages(bytes: Buffer) {
-  const count = bytes.readUInt16LE(4);
-  if (!count || count > 32 || bytes.length < 6 + count * 16) throw new Error("Invalid ICO directory");
-  const entries = Array.from({ length: count }, (_, index) => {
-    const entry = bytes.subarray(6 + index * 16, 22 + index * 16);
-    const size = entry.readUInt32LE(8);
-    const offset = entry.readUInt32LE(12);
-    if (size < 40 || offset < 6 + count * 16 || offset + size > bytes.length) return null;
-    const payload = bytes.subarray(offset, offset + size);
-    if (payload.readUInt32BE(0) !== 0x89504e47) {
-      const width = payload.readInt32LE(4);
-      const height = payload.readInt32LE(8);
-      if (width < 1 || width > 256 || height < 1 || height > 512) return null;
-    }
-    const single = Buffer.concat([Buffer.from([0, 0, 1, 0, 1, 0]), entry, payload]);
-    single.writeUInt32LE(22, 18);
-    return { single, size: (entry[0] || 256) * (entry[1] || 256) };
-  });
-  return entries.filter((entry) => entry !== null).sort((a, b) => b.size - a.size);
-}
-
 async function normalizeRaster(input: sharp.Sharp): Promise<PreparedFavicon> {
   const { data, info } = await input
     .timeout({ seconds: 1 })
@@ -122,18 +100,6 @@ export async function prepareFavicon(bytes: Buffer): Promise<PreparedFavicon | n
   if (!bytes.length || bytes.length > MAX_ICON_BYTES) return null;
   try {
     if (bytes.toString("utf8", 0, 256).trimStart().startsWith("<")) return sanitizeSvg(bytes);
-    if (bytes.length >= 6 && bytes.readUInt32LE(0) === 0x00010000) {
-      for (const { single } of icoImages(bytes)) {
-        try {
-          const image = decodeIco(single)[0];
-          if (!image) continue;
-          return await normalizeRaster(image.type === "bmp"
-            ? sharp(Buffer.from(image.data), { raw: { width: image.width, height: image.height, channels: 4 }, limitInputPixels: MAX_PIXELS })
-            : sharp(image.data, { limitInputPixels: MAX_PIXELS }));
-        } catch { /* A corrupt entry must not hide another usable resolution. */ }
-      }
-      return null;
-    }
     const signature = bytes.subarray(0, 12);
     const raster = signature.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
       || signature.subarray(0, 3).equals(Buffer.from([255, 216, 255]))
