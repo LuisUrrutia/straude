@@ -134,7 +134,7 @@ export async function discoverFavicon(origin: URL, signal?: AbortSignal): Promis
       () => controller.abort(),
       (url, limit) => {
         const deadline = AbortSignal.timeout(2000);
-        return createPublicFetch(signal ? AbortSignal.any([signal, deadline]) : deadline)(url, limit);
+        return createPublicFetch(signal ? AbortSignal.any([signal, deadline]) : deadline, MAX_ICON_BYTES)(url, limit);
       },
     );
   } finally {
@@ -160,18 +160,29 @@ export async function discoverWithFetch(
 }
 
 async function discoverDirect(origin: URL, fetch: FaviconFetch, cancel: () => void): Promise<PreparedFavicon | null> {
-  const fetched = new Map<string, Promise<FaviconResponse | null>>();
+  type Resource =
+    | { kind: "image"; icon: PreparedFavicon; sourceBytes: number }
+    | { kind: "document"; html: ReturnType<typeof htmlCandidates>; manifest: Candidate[]; sourceBytes: number };
+  const fetched = new Map<string, Promise<Resource | null>>();
   const get = (url: URL, limit: number) => {
     let pending = fetched.get(url.href);
     if (!pending) {
-      pending = fetch(url, limit).catch(() => null);
+      pending = (async (): Promise<Resource | null> => {
+        const response = await fetch(url, limit);
+        if (!response || response.bytes.length > limit) return null;
+        const sourceBytes = response.bytes.length;
+        const icon = await prepareFavicon(response.bytes);
+        if (icon) return { kind: "image", icon, sourceBytes };
+        if (sourceBytes > DOCUMENT_BYTES) return null;
+        return { kind: "document", html: htmlCandidates(response), manifest: manifestCandidates(response), sourceBytes };
+      })().catch(() => null);
       fetched.set(url.href, pending);
     }
-    return pending.then((response) => response && response.bytes.length <= limit ? response : null);
+    return pending.then((resource) => resource && resource.sourceBytes <= limit ? resource : null);
   };
   const image = async (url: URL) => {
-    const response = await get(url, MAX_ICON_BYTES);
-    return response ? prepareFavicon(response.bytes) : null;
+    const resource = await get(url, MAX_ICON_BYTES);
+    return resource?.kind === "image" ? resource.icon : null;
   };
   const [rootIcon, html] = await Promise.all([
     image(new URL("/favicon.svg", origin)).then((icon) => {
@@ -182,10 +193,10 @@ async function discoverDirect(origin: URL, fetch: FaviconFetch, cancel: () => vo
   ]);
   if (rootIcon?.format === "svg") return rootIcon;
 
-  const declared = html ? htmlCandidates(html) : { icons: [], manifests: [] };
+  const declared = html?.kind === "document" ? html.html : { icons: [], manifests: [] };
   const manifests = await pairs(declared.manifests, async (url) => {
     const response = await get(url, DOCUMENT_BYTES);
-    return response ? manifestCandidates(response) : [];
+    return response?.kind === "document" ? response.manifest : [];
   });
   const choose = async (items: Candidate[]) => {
     let raster: { icon: PreparedFavicon; candidate: Candidate } | null = null;
@@ -215,9 +226,9 @@ async function discoverDirect(origin: URL, fetch: FaviconFetch, cancel: () => vo
     const response = await get(new URL(path, origin), path === "/favicon.png" ? MAX_ICON_BYTES : DOCUMENT_BYTES);
     return { path, response };
   });
-  const conventionalIcon = await choose(conventional.flatMap(({ path, response }) => path !== "/favicon.png" && response ? manifestCandidates(response) : []));
+  const conventionalIcon = await choose(conventional.flatMap(({ path, response }) => path !== "/favicon.png" && response?.kind === "document" ? response.manifest : []));
   if (conventionalIcon) return conventionalIcon;
   const png = conventional.find(({ path }) => path === "/favicon.png")?.response;
-  const prepared = png ? await prepareFavicon(png.bytes) : null;
+  const prepared = png?.kind === "image" ? png.icon : null;
   return prepared;
 }

@@ -36,14 +36,15 @@ function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
   });
 }
 
-export function createPublicFetch(signal: AbortSignal): FaviconFetch {
+export function createPublicFetch(signal: AbortSignal, maxTotalBytes = 12 * 1024 * 1024): FaviconFetch {
   let requests = 0;
+  let remainingBytes = maxTotalBytes;
   return async (initialUrl, maxBytes) => {
     try {
       let url = initialUrl;
       for (let redirect = 0; redirect <= 3; redirect++) {
         signal.throwIfAborted();
-        if (!publicHttpUrl(url.href) || ++requests > 24) return null;
+        if (remainingBytes <= 0 || !publicHttpUrl(url.href) || ++requests > 24) return null;
         const hostname = url.hostname.replace(/^\[|\]$/g, "");
         const addresses = isIP(hostname)
           ? [{ address: hostname, family: isIP(hostname) }]
@@ -73,7 +74,7 @@ export function createPublicFetch(signal: AbortSignal): FaviconFetch {
               return;
             }
             if (status < 200 || status >= 300
-              || Number(res.headers["content-length"]) > maxBytes
+              || Number(res.headers["content-length"]) > Math.min(maxBytes, remainingBytes)
               || (res.headers["content-encoding"] && res.headers["content-encoding"] !== "identity")) {
               res.destroy();
               resolve(null);
@@ -83,7 +84,8 @@ export function createPublicFetch(signal: AbortSignal): FaviconFetch {
             let length = 0;
             res.on("data", (chunk: Buffer) => {
               length += chunk.length;
-              if (length > maxBytes) {
+              remainingBytes -= chunk.length;
+              if (length > maxBytes || remainingBytes < 0) {
                 res.destroy();
                 resolve(null);
               } else chunks.push(chunk);

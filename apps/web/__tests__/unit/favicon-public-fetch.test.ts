@@ -101,6 +101,22 @@ describe("public favicon transport", () => {
     for (const path of ["/large", "/declared-large", "/compressed"]) expect(await fetch(new URL(path, "https://example.com"), 8)).toBeNull();
   });
 
+  it("shares a cumulative byte budget across concurrent downloads", async () => {
+    const fetch = createPublicFetch(AbortSignal.timeout(1000), 6);
+    const results = await Promise.all([fetch(new URL("https://example.com/icon"), 100), fetch(new URL("https://example.com/icon"), 100)]);
+
+    expect(results.filter(Boolean)).toHaveLength(1);
+    expect(await fetch(new URL("https://example.com/icon"), 100)).toBeNull();
+  });
+
+  it("charges streamed bytes even when a resource exceeds its individual limit", async () => {
+    const fetch = createPublicFetch(AbortSignal.timeout(1000), 5);
+
+    expect(await fetch(new URL("https://example.com/large"), 4)).toBeNull();
+    expect(await fetch(new URL("https://example.com/icon"), 100)).toBeNull();
+    expect(paths).toEqual(["/large"]);
+  });
+
   it("aborts stalled body reads and stalled DNS within the same deadline", async () => {
     expect(await createPublicFetch(AbortSignal.timeout(30))(new URL("https://example.com/slow"), 100)).toBeNull();
     vi.mocked(lookup).mockImplementation(() => new Promise(() => {}));
