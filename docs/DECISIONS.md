@@ -1,5 +1,39 @@
 # Architecture & Design Decisions
 
+## Preserve Live Privacy, Rank, and Auth Checks (2026-09-04)
+
+**Decision:** Deduplicate server identity, shell profiles, and leaderboards only within a request. Both middleware and the shared identity loader retain Supabase `getUser()`. Leaderboard listings and ranks read the existing live views, matching the CLI and profile readers.
+
+**Alternatives considered:** (a) Keep persistent snapshot caches and add freshness validation, live visibility filtering, and invalidation for every usage and privacy mutation. This saves aggregate reads but creates more cache ownership and can still disagree with live ranks. (b) Keep live views and request-only deduplication. Chosen: the historical SQL difference was about 2.5ms, while immediate first-sync ranks and privacy changes affect user trust.
+
+**Auth trade-off:** Local `getClaims()` verifies token signatures cheaply but does not fetch the current Auth user. The earlier version removed the server check; this revision retains main's behavior. Neither method alone promises immediate sign-out revocation for an unexpired access token. Strict revocation requires validating `session_id` against `auth.sessions`; that broader auth contract is unchanged. See [Supabase session guidance](https://supabase.com/docs/guides/auth/sessions#how-to-ensure-an-access-token-jwt-cannot-be-used-after-a-user-signs-out).
+
+## Bound Profile Snapshot Age and Keep a Live Fallback (2026-09-04)
+
+**Decision:** Read profile radar snapshots through the service client after the caller's existing live profile-access check. Accept snapshots at most 20 minutes old. Missing rows, unavailable migrations, and stale or invalid timestamps use the previous live calculation. Only request-level deduplication applies to snapshot reads.
+
+**Why:** New users and stopped refresh jobs must not lose their chart. The live fallback retains main's five-minute distribution cache and fails clearly on query errors. Snapshot tables remain private, and the already-deployed migrations remain in history. User-facing leaderboard reads no longer use the leaderboard snapshot table.
+
+**Trade-off:** Radar percentiles may lag usage by up to 20 minutes before the live fallback takes over. This is separate from rank and spend totals, which remain live. The background refresh still computes leaderboard rows; removing that already-deployed work needs a separate migration.
+
+## Server Initial Data, Route Loading, and Bundle Analysis (2026-07-18)
+
+**Decision:** Render initial settings, search, card, and recap data on the server; keep subsequent interactions client-side. Give every authenticated gating route an accessible `loading.tsx` boundary. Run `@next/bundle-analyzer` only when `ANALYZE=1`, using its required webpack build while normal production builds remain on Turbopack.
+
+**Why:** Fetch-on-mount delayed useful content and made placeholders the initial page state. Server initial data removes that waterfall, loading boundaries preserve responsive navigation, and the July analyzer run exposed a development-only Agentation import. Its historical 39 KiB gzip measurement has not been repeated for current dependencies.
+
+**Tradeoff:** The actual useful page can become the LCP candidate, so a metric may rise from a trivial loading label even when the page is more usable. Heavy dependencies that were already correctly lazy-loaded remain unchanged.
+
+**Search ownership:** Server rendering loads deep-link results with the same validated filter as the API. Later edits use one debounced API request and a native history update. Server-driven navigation was the alternative; it would require moving result and loading state ownership to the server. Keeping the existing client interaction avoids duplicate searches and preserves the current input behavior.
+
+**Current-main compatibility:** The later API authorization migration remains the effective owner of streak RPC authorization and behavior. The earlier snapshot migration does not override it on deployment. Settings saves retain the browser timezone fallback when the stored timezone is missing.
+
+## Local Performance Measurements and Post-Deploy RUM (2026-09-04)
+
+**Decision:** Keep the production-build Playwright measurement harness and optional `perf:check` thresholds. Before recording metrics, verify the target returns success, remains on the intended route, and has an authenticated application shell. Remote Supabase projects require explicit `PERF_ALLOW_REMOTE=1`; default verification uses a local fixture.
+
+**Evidence boundary:** The July scorecards describe the earlier claims-only authentication and persistent snapshot-cache implementation. They do not prove performance of this revision or a production p75 result. The current comparison in `docs/perf/PLAN.md` uses the same runtime, seed, and browser for main and this revision. It does not establish a production percentile. PostHog web vitals remain a post-deploy check.
+
 ## Follow released ccusage source support through the unified collector (2026-09-04)
 
 **Decision:** Raise the bundled dependency and runtime floor to ccusage 20.0.20. Keep the existing source-agnostic daily report and metadata pipeline. Its released native binary exposes 16 coding-agent sources, including Gemini CLI, Qwen, and Grok Build CLI. Antigravity and ZCode appear on upstream main but are absent from this release; Mistral Vibe remains unsupported.

@@ -18,10 +18,17 @@
 
 ### Added
 
+- **Authenticated performance harness and local performance gate.** A production-build Playwright harness measures warm TTFB, FCP, LCP, middleware auth, layout attribution, and the right-sidebar API across 10 core authenticated pages. It validates authenticated navigation before recording metrics and requires an explicit opt-in for remote Supabase projects. The current local comparison is in `docs/perf/PLAN.md`; it shows faster settings, recap, and search without claiming every page is below 500ms.
+- **Private leaderboard and profile-stat snapshots.** Service-role-only tables store radar percentiles and historical leaderboard aggregates. A `pg_cron` job refreshes them transactionally every 10 minutes. Radar reads fall back to the existing live calculation when rows are missing, stale, or unavailable. User-facing leaderboard listings and ranks remain live so first syncs and privacy changes take effect immediately.
+- **Route loading shells and bundle analysis.** All authenticated gating routes now have accessible loading boundaries. `@next/bundle-analyzer` runs behind `ANALYZE=1`; the development-only Agentation toolbar stays outside production imports. The July bundle-size measurement has not been repeated for current dependencies.
+
 - **Public trust and agent guidance surfaces.** Added substantive `/about` and `/contact` pages, proposal-conformant `/llms.txt` with concrete when-to-use and safety guidance, negotiated Markdown for `/`, `/about`, `/contact`, `/privacy`, `/cli`, and `/open`, and complete Organization JSON-LD with the established Pacific Systems legal name, support email, and country-only US postal address. Dry-run guidance consistently describes collection without submission. Footer and sitemap links expose the new pages.
 - **Daily `/api/cron/refresh-open-stats` cron** (Vercel cron, 05:00 UTC) that runs the live open-stats aggregation and persists a durable snapshot. Closes the gap left by the activation performance work, where `/open` and the landing ticker were switched to snapshot-only reads but nothing refreshed the snapshot.
 
 ### Changed
+
+- **Authenticated pages share server-confirmed identity and profile reads.** Request-only deduplication removes repeated work across layouts and pages while preserving `getUser()` and current privacy checks.
+- **Core authenticated pages render useful initial data from the server.** Settings, search, card, and recap no longer fetch their initial state after mount. Leaderboard data uses request-only deduplication, and the sidebar retains main's live reads, so privacy changes and fresh usage are visible on the next request.
 
 - **Track all 16 coding-agent sources released in ccusage 20.0.20.** Straude CLI 0.1.31 raises the dependency floor and lockfile to 20.0.20, adding Grok Build CLI to the existing unified collector. Gemini-only, Qwen-only, Grok-only, and mixed synthetic sessions now run through the real bundled binary in regression tests. Tests verify source IDs, token buckets, reasoning, and model costs, and the API tests store row-specific metadata for every released source. CLI documentation and public product guidance describe the broader support. Join pages and share images use "AI coding" so Gemini, Qwen, and other usage is not mislabeled as Claude Code. Mistral Vibe remains an upstream collector gap.
 
