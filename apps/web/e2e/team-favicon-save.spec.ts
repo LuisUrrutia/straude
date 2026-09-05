@@ -65,6 +65,14 @@ for (const format of ["svg", "png"]) {
       await expect(badge).toBeVisible();
       await page.screenshot({ path: testInfo.outputPath(`settings-${format}.png`), fullPage: true });
 
+      await page.keyboard.press("ControlOrMeta+k");
+      const commands = page.getByRole("combobox");
+      await expect(commands).toBeVisible();
+      await commands.fill("Leaderboard");
+      await expect(page.getByRole("option").first()).toContainText("Leaderboard");
+      await commands.press("Enter");
+      await expect(page).toHaveURL(/\/leaderboard$/);
+      await page.goto("/settings");
       await page.reload();
       await expect(page.getByLabel("Team", { exact: true })).toHaveValue(`https://${domain}`);
       await page.goto(`/u/${username}`);

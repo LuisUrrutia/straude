@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **Deferred command palette loading preserves page state.** Mount the palette alongside the page instead of wrapping it after idle loading. Early settings edits and focus now survive palette initialization, and the command shortcut remains available while its module loads.
+
 - **CI browser tests use the running local Supabase stack.** Generate the web environment before building so the browser bundle, server and authenticated E2E fixtures share valid local credentials instead of placeholders.
 
 - **Do not delay declared SVG icons behind manifests.** Try known HTML SVG candidates first and return a usable vector without waiting for manifest downloads. Mislabeled raster results remain available while checking for a real SVG.
