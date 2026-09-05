@@ -54,13 +54,14 @@ describe("live leaderboard loaders", () => {
     await expect(loadLeaderboardRank("week", "new-user", "europe")).resolves.toBe(3);
     expect(mocks.from.mock.calls.map(([source]) => source))
       .toEqual(["leaderboard_weekly", "leaderboard_weekly"]);
+    expect(entry.eq).toHaveBeenCalledWith("region", "europe");
     expect(above.gt).toHaveBeenCalledWith("total_cost", 10);
     expect(above.eq).toHaveBeenCalledWith("region", "europe");
   });
 
-  it("returns no rank when a user is no longer public", async () => {
+  it("returns no rank outside the selected region or after a user becomes private", async () => {
     mocks.from.mockReturnValue(queryResult({ data: null, error: null }));
-    await expect(loadLeaderboardRank("week", "private-user")).resolves.toBeNull();
+    await expect(loadLeaderboardRank("week", "private-user", "europe")).resolves.toBeNull();
     expect(mocks.from).toHaveBeenCalledOnce();
   });
 

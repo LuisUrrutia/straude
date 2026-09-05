@@ -79,4 +79,10 @@ describe("settings profile update payload", () => {
       github_username: "alice",
     });
   });
+
+  it("uses the browser timezone when the saved profile has no timezone", () => {
+    expect(buildProfileUpdatePayload({ ...baseInput, timezone: "" }).timezone)
+      .toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  });
+
 });

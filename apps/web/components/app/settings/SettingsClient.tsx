@@ -46,7 +46,7 @@ export function buildProfileUpdatePayload(input: ProfileUpdatePayloadInput) {
     email_notifications: input.emailNotifications,
     email_mention_notifications: input.emailMentionNotifications,
     email_dm_notifications: input.emailDmNotifications,
-    timezone: input.timezone,
+    timezone: input.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
   };
 }
 
@@ -165,6 +165,7 @@ export default function SettingsClient({
       const data = await res.json();
       setProfile((prev) => (prev ? { ...prev, ...data } : data));
       setTeamUrl(data.team_url ?? "");
+      setTimezone(data.timezone ?? timezone);
       setSaved(true);
       posthog.capture("profile_saved", { is_public: isPublic });
     }

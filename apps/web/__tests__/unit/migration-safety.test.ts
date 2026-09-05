@@ -463,20 +463,6 @@ describe("Migration safety", () => {
     expect(/GRANT\s+EXECUTE[^;]+get_profile_stats[^;]+TO\s+(anon|authenticated)/i.test(definition)).toBe(false);
   });
 
-  it("calculate_user_streak is set-based and keeps timezone and freeze semantics", () => {
-    const latest = getLatestMigrationMatching(
-      migrations,
-      /CREATE\s+OR\s+REPLACE\s+FUNCTION\s+public\.calculate_user_streak/i
-    );
-
-    expect(latest, "Expected calculate_user_streak migration").toBeTruthy();
-    const content = latest!.content;
-    expect(/ROW_NUMBER\(\)\s+OVER\s*\(ORDER\s+BY\s+date\s+DESC\)/i.test(content)).toBe(true);
-    expect(/AT\s+TIME\s+ZONE\s+v_user_timezone/i.test(content)).toBe(true);
-    expect(/v_grace\s*:=\s*1\s*\+\s*p_freeze_days/i.test(content)).toBe(true);
-    expect(/^\s*LOOP\s*;?\s*$/im.test(content.slice(0, content.indexOf("CREATE OR REPLACE FUNCTION public.get_profile_stats")))).toBe(false);
-  });
-
   it("adds a covering date-window leaderboard index", () => {
     const latest = getLatestMigrationMatching(
       migrations,

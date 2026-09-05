@@ -24,6 +24,10 @@
 
 **Tradeoff:** The actual useful page can become the LCP candidate, so a metric may rise from a trivial loading label even when the page is more usable. Heavy dependencies that were already correctly lazy-loaded remain unchanged.
 
+**Search ownership:** Server rendering loads deep-link results with the same validated filter as the API. Later edits use one debounced API request and a native history update. Server-driven navigation was the alternative; it would require moving result and loading state ownership to the server. Keeping the existing client interaction avoids duplicate searches and preserves the current input behavior.
+
+**Current-main compatibility:** The later API authorization migration remains the effective owner of streak RPC authorization and behavior. The earlier snapshot migration does not override it on deployment. Settings saves retain the browser timezone fallback when the stored timezone is missing.
+
 ## Local Performance Measurements and Post-Deploy RUM (2026-09-04)
 
 **Decision:** Keep the production-build Playwright measurement harness and optional `perf:check` thresholds. Before recording metrics, verify the target returns success, remains on the intended route, and has an authenticated application shell. Remote Supabase projects require explicit `PERF_ALLOW_REMOTE=1`; default verification uses a local fixture.

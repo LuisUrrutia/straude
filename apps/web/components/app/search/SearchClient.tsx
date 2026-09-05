@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Search } from "lucide-react";
 import type { User } from "@/types";
@@ -19,7 +18,6 @@ export default function SearchClient({
   initialQuery: string;
   initialResults: SearchUser[];
 }) {
-  const router = useRouter();
   const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState<SearchUser[]>(initialResults);
   const [loading, setLoading] = useState(false);
@@ -32,14 +30,15 @@ export default function SearchClient({
     if (value.length < 2) {
       setResults([]);
       setLoading(false);
-      router.replace("/search", { scroll: false });
+      window.history.replaceState(null, "", "/search");
       return;
     }
 
     timerRef.current = setTimeout(async () => {
       setLoading(true);
       const params = new URLSearchParams({ q: value });
-      router.replace(`/search?${params.toString()}`, { scroll: false });
+      // URL-only updates avoid a second server search beside the API request.
+      window.history.replaceState(null, "", `/search?${params.toString()}`);
 
       const res = await fetch(`/api/search?q=${encodeURIComponent(value)}&limit=20`);
       const data = await res.json().catch(() => ({}));

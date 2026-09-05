@@ -79,11 +79,12 @@ async function queryLeaderboardRank(
 ): Promise<number | null> {
   const db = getServiceClient();
   const source = VIEW_BY_PERIOD[period];
-  const entry = await db
+  let entryQuery = db
     .from(source)
     .select("total_cost")
-    .eq("user_id", userId)
-    .maybeSingle();
+    .eq("user_id", userId);
+  if (region) entryQuery = entryQuery.eq("region", region);
+  const entry = await entryQuery.maybeSingle();
 
   if (entry.error || !entry.data) return null;
 

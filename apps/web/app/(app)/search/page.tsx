@@ -3,12 +3,7 @@ import SearchClient, {
 } from "@/components/app/search/SearchClient";
 import { createClient } from "@/lib/supabase/server";
 
-const PUBLIC_USER_FIELDS =
-  "id, username, display_name, bio, avatar_url, is_public";
-
-function sanitizeSearchFilter(value: string): string {
-  return value.replace(/[,()\\@]/g, "");
-}
+import { buildUserSearchFilter, PUBLIC_USER_FIELDS } from "@/lib/data/user-search";
 
 export default async function SearchPage({
   searchParams,
@@ -19,16 +14,14 @@ export default async function SearchPage({
   const query = typeof params.q === "string" ? params.q : "";
   let initialResults: SearchUser[] = [];
 
-  if (query.length >= 2) {
+  const search = buildUserSearchFilter(query);
+  if (search.ok) {
     const supabase = await createClient();
-    const safe = sanitizeSearchFilter(query);
     const { data } = await supabase
       .from("users")
       .select(PUBLIC_USER_FIELDS)
       .eq("is_public", true)
-      .or(
-        `username.ilike.%${safe}%,display_name.ilike.%${safe}%,github_username.ilike.%${safe}%`,
-      )
+      .or(search.filter)
       .limit(20);
 
     initialResults = data ?? [];
