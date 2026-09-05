@@ -1,4 +1,4 @@
-import { JSDOM } from "jsdom";
+import { SAXParser } from "parse5-sax-parser";
 import { createPublicFetch, publicHttpUrl, type FaviconFetch, type FaviconResponse } from "./public-fetch";
 import { MAX_ICON_BYTES, prepareFavicon, type PreparedFavicon } from "./image";
 
@@ -36,30 +36,60 @@ function rank(candidates: Candidate[]): Candidate[] {
 }
 
 export function htmlCandidates(response: FaviconResponse): { icons: Candidate[]; manifests: URL[] } {
-  const dom = new JSDOM(response.bytes.toString("utf8"), { url: response.url.href });
+  if (response.bytes.length > DOCUMENT_BYTES) return { icons: [], manifests: [] };
+  const parser = new SAXParser();
+  const links: Record<string, string>[] = [];
+  let baseHref: string | undefined;
+  let tokens = 0;
+  let stopped = false;
+  let templates = 0;
+  const withinBudget = () => {
+    if (++tokens <= 2048) return true;
+    stopped = true;
+    parser.stop();
+    return false;
+  };
+  parser.on("startTag", ({ tagName, attrs }) => {
+    if (!withinBudget()) return;
+    if (tagName === "template") templates++;
+    if (templates || !["link", "base"].includes(tagName)) return;
+    const attributes = Object.fromEntries(attrs.map(({ name, value }) => [name, value]));
+    if (attributes.href === undefined) return;
+    if (tagName === "base" && baseHref === undefined) baseHref = attributes.href;
+    if (tagName === "link" && links.length < 64) links.push(attributes);
+  });
+  parser.on("endTag", ({ tagName }) => {
+    if (!withinBudget()) return;
+    if (tagName === "template" && templates) templates--;
+  });
   try {
-    const document = dom.window.document;
-    const baseHref = document.querySelector("base[href]")?.getAttribute("href");
-    const base = baseHref ? publicHttpUrl(baseHref, response.url) ?? response.url : response.url;
-    const icons: Candidate[] = [];
-    const manifests: URL[] = [];
-    for (const link of Array.from(document.querySelectorAll("link[href]")).slice(0, 64)) {
-      const rel = (link.getAttribute("rel") ?? "").toLowerCase().split(/\s+/);
-      const href = link.getAttribute("href") ?? "";
-      const media = (link.getAttribute("media") ?? "").trim().toLowerCase();
-      // Prefer the default/light icon for the shared, theme-independent cache.
-      const item = candidate({
-        raw: href, base, type: link.getAttribute("type") ?? "", sizes: link.getAttribute("sizes") ?? "",
-        media: !media || media === "all" || media === "screen" ? 0 : media === "(prefers-color-scheme: light)" ? 1 : 2,
-      });
-      if (!item) continue;
-      if (rel.includes("icon") || rel.includes("apple-touch-icon")) icons.push(item);
-      if (rel.includes("manifest") && !manifests.some((url) => url.href === item.url.href) && manifests.length < 2) manifests.push(item.url);
+    const source = response.bytes.toString("utf8");
+    const deadline = performance.now() + 100;
+    // Chunking permits deadline checks even inside a large unfinished tag.
+    for (let offset = 0; offset < source.length && !stopped; offset += 1024) {
+      if (performance.now() >= deadline) { parser.stop(); break; }
+      parser.write(source.slice(offset, offset + 1024));
     }
-    return { icons: rank(icons).slice(0, MAX_CANDIDATES), manifests };
+    parser.end();
   } finally {
-    dom.window.close();
+    parser.destroy();
   }
+  const base = baseHref ? publicHttpUrl(baseHref, response.url) ?? response.url : response.url;
+  const icons: Candidate[] = [];
+  const manifests: URL[] = [];
+  for (const link of links) {
+    const rel = (link.rel ?? "").toLowerCase().split(/\s+/);
+    const media = (link.media ?? "").trim().toLowerCase();
+    // Prefer the default/light icon for the shared, theme-independent cache.
+    const item = candidate({
+      raw: link.href, base, type: link.type ?? "", sizes: link.sizes ?? "",
+      media: !media || media === "all" || media === "screen" ? 0 : media === "(prefers-color-scheme: light)" ? 1 : 2,
+    });
+    if (!item) continue;
+    if (rel.includes("icon") || rel.includes("apple-touch-icon")) icons.push(item);
+    if (rel.includes("manifest") && !manifests.some((url) => url.href === item.url.href) && manifests.length < 2) manifests.push(item.url);
+  }
+  return { icons: rank(icons).slice(0, MAX_CANDIDATES), manifests };
 }
 
 export function manifestCandidates(response: FaviconResponse): Candidate[] {
@@ -119,7 +149,7 @@ export async function discoverWithFetch(
   cancel: () => void = () => {},
   fallbackFetch: FaviconFetch = fetch,
 ): Promise<PreparedFavicon | null> {
-  const direct = await discoverDirect(origin, fetch, cancel);
+  const direct = await discoverDirect(origin, fetch, cancel).catch(() => null);
   if (direct) return direct;
   const google = new URL("https://www.google.com/s2/favicons");
   google.searchParams.set("domain", origin.hostname.toLowerCase());

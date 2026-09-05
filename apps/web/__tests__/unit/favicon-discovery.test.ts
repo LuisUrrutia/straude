@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from "vitest";
 import sharp from "sharp";
+import { SAXParser } from "parse5-sax-parser";
 import { discoverWithFetch, htmlCandidates, manifestCandidates } from "@/lib/favicons/discover";
 import type { FaviconResponse } from "@/lib/favicons/public-fetch";
 
@@ -27,6 +28,36 @@ describe("favicon discovery", () => {
     const result = htmlCandidates(response('<base href="../assets/"><link REL="SHORTCUT ICON" href="mark.png" sizes="32x32"><link rel="ICON" href="mark.png"><link rel="apple-touch-icon" href="large.png" sizes="192x192"><link rel="icon" href="vector" type="image/svg+xml"><link rel="manifest" href="app.json"><meta property="og:image" content="banner.png">', "https://cdn.example.com/docs/page"));
     expect(result.icons.map((icon) => icon.url.href)).toEqual(["https://cdn.example.com/assets/vector", "https://cdn.example.com/assets/large.png", "https://cdn.example.com/assets/mark.png"]);
     expect(result.manifests[0]?.href).toBe("https://cdn.example.com/assets/app.json");
+  });
+
+  it("extracts early links without building a deeply nested body DOM", () => {
+    const html = '<link rel="icon" href="/early.svg">' + '<div>'.repeat(10_000)
+      + '<link rel="icon" href="/late.svg">' + '</div>'.repeat(10_000);
+    const result = htmlCandidates(response(html));
+    expect(result.icons.map((icon) => icon.url.pathname)).toEqual(["/early.svg"]);
+  }, 10_000);
+
+  it("ignores inert markup and resolves links against the first non-template base", () => {
+    const html = '<script>"<link rel=icon href=/script.svg>"</script>'
+      + '<style>/* <link rel=icon href=/style.svg> */</style>'
+      + '<!-- <link rel=icon href=/comment.svg> -->'
+      + '<template><base href="https://wrong.example/"><link rel=icon href=/template.svg></template>'
+      + '<textarea><link rel=icon href=/textarea.svg></textarea>'
+      + '<link rel="icon" href="logo.svg?a=1&amp;b=2"><base href="/assets/"><base href="/ignored/">';
+    expect(htmlCandidates(response(html)).icons.map((icon) => icon.url.href))
+      .toEqual(["https://example.com/assets/logo.svg?a=1&b=2"]);
+  });
+
+  it("still tries Google when direct HTML parsing throws", async () => {
+    const png = await sharp({ create: { width: 16, height: 16, channels: 4, background: "red" } }).png().toBuffer();
+    const fixture = site({ "/": "<html></html>", "https://www.google.com/s2/favicons?domain=example.com&sz=128": png });
+    const parser = vi.spyOn(SAXParser.prototype, "write").mockImplementationOnce(() => { throw new Error("Parser failure"); });
+    try {
+      expect((await discoverWithFetch(origin, fixture.fetch))?.format).toBe("png");
+      expect(fixture.paths().at(-1)).toContain("www.google.com/s2/favicons");
+    } finally {
+      parser.mockRestore();
+    }
   });
 
   it("resolves manifest icons relative to the final manifest URL and prefers any purpose", () => {

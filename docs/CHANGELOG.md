@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- **Bound HTML favicon parsing.** Extract links without constructing an untrusted document DOM, with token and parsing-time limits. Deeply nested pages no longer overflow the stack or prevent the Google fallback.
+
 ### Changed
 
 - **Team favicons prefer organization sites with Google as a fallback.** Discovery prefers sanitized SVG from conventional paths, HTML icon links and web manifests. If direct discovery finds no usable image, the server requests Google's favicon endpoint. ICO links and bodies are excluded, with no ICO decoder dependency. Raster images become lossless PNG output inside 128×128 without enlargement or cropping. Downloads validate public IP destinations and pin each connection to its checked address, with bounded redirects, concurrency, bytes and deadlines. Reusing a downloaded URL preserves the byte limit of each consuming resource.

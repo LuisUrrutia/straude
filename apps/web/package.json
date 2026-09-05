@@ -41,6 +41,7 @@
     "lucide-react": "^0.474",
     "motion": "^12",
     "next": "16.2.6",
+    "parse5-sax-parser": "8.0.0",
     "posthog-js": "1.383.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",
