@@ -31,6 +31,7 @@ function temporaryDirectory(): string {
 function batch(): PendingUsageBatch {
   const date = "2026-07-23";
   return {
+    account_key: "a".repeat(64),
     request: {
       protocol_version: 2,
       request_id: randomUUID(),

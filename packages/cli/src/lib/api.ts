@@ -1,5 +1,6 @@
 import type { StraudeConfig } from "./auth.js";
 import { updateConfig } from "./auth.js";
+import { syncAccountKey } from "./sync-account.js";
 import { isInteractive } from "./prompt.js";
 
 export const REFRESHED_TOKEN_HEADER = "x-straude-refreshed-token";
@@ -266,6 +267,7 @@ async function doRequest<T>(
   path: string,
   options: ApiRequestOptions,
 ): Promise<T> {
+  const accountKey = syncAccountKey(config);
   const prepared = prepareRequest(options);
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -283,11 +285,14 @@ async function doRequest<T>(
   const refreshed = response.headers.get(REFRESHED_TOKEN_HEADER);
   if (refreshed) {
     config.token = refreshed;
+    const skipRefresh = Symbol("authentication changed");
     try {
-      updateConfig((current) => current
-        ? { ...current, token: refreshed }
-        : { ...config, token: refreshed });
+      updateConfig((current) => {
+        if (!current || syncAccountKey(current) !== accountKey) throw skipRefresh;
+        return { ...current, token: refreshed };
+      });
     } catch (error) {
+      if (error === skipRefresh) return readJson(response, prepared.deadlineAt, prepared.timeoutMs) as Promise<T>;
       const code = (error as NodeJS.ErrnoException).code;
       if (code !== "EACCES" && code !== "EPERM" && code !== "EROFS") throw error;
     }
@@ -310,7 +315,7 @@ export async function apiRequest<T>(
       isInteractive()
     ) {
       const fresh = await authRefreshStrategy(config.api_url);
-      if (!fresh) throw error;
+      if (!fresh || syncAccountKey(fresh) !== syncAccountKey(config)) throw error;
       config.token = fresh.token;
       config.username = fresh.username;
       return doRequest<T>(config, path, { ...options, maxRetries: 0 });

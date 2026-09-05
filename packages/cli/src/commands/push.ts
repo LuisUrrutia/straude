@@ -32,6 +32,7 @@ import {
   type CcusageCollectorMeta,
   type CcusageDailyEntry,
 } from "../lib/ccusage.js";
+import { syncAccountKey } from "../lib/sync-account.js";
 import { getDistinctId, getInstallationId } from "../lib/machine-id.js";
 import { isInteractive } from "../lib/prompt.js";
 import { posthog } from "../lib/posthog.js";
@@ -483,6 +484,18 @@ async function submitBatch(
     .map((entry) => terminal.get(entry.date))
     .filter((outcome): outcome is UsageOutcomeV2 => outcome !== undefined);
   const exitCode = outcomeExitCode(outcomes);
+  for (const outcome of outcomes) {
+    if (!outcome.error) continue;
+    console.error(`${outcome.date}: ${outcome.error.code}: ${outcome.error.message}`);
+    reportUsagePushFailed(config, new Error("Usage date was rejected"), {
+      command: "push",
+      stage: "submit",
+      request_id: batch.request.request_id,
+      error_code: outcome.error.code,
+      outcome: outcome.status,
+      retry_count: lastAttempt,
+    });
+  }
   const results = [...terminal.values()]
     .flatMap((outcome): DatedUsageResult[] => (
       outcome.result ? [{ date: outcome.date, ...outcome.result }] : []
@@ -508,6 +521,7 @@ async function submitBatch(
 function advanceCompletedBatch(batch: PendingUsageBatch): StraudeConfig {
   return updateConfig((current) => {
     if (!current) throw new Error("Authentication disappeared while syncing.");
+    if (syncAccountKey(current) !== batch.account_key) return current;
     const {
       codex_native_repair_completed_at: _obsoleteRepair,
       codex_native_last_token_usage_repair_completed_at: _obsoleteLastTokenRepair,
@@ -520,7 +534,10 @@ function advanceCompletedBatch(batch: PendingUsageBatch): StraudeConfig {
     const lastDate = batch.watermark_date;
     return {
       ...preserved,
-      ...(automatic && lastDate ? { last_push_date: lastDate } : {}),
+      ...(automatic && lastDate ? {
+        last_push_date: current.last_push_date && current.last_push_date > lastDate
+          ? current.last_push_date : lastDate,
+      } : {}),
       ...(batch.migration_pending
         ? { usage_protocol_v2_migration_completed_at: new Date().toISOString() }
         : {}),
@@ -715,7 +732,8 @@ export async function pushCommand(
       }
     }
 
-    for (const pending of loadPendingBatches()) {
+    for (const pending of options.dryRun ? [] : loadPendingBatches()) {
+      if (pending.account_key !== syncAccountKey(config)) continue;
       const pendingResult = await submitBatch(config, pending, !nonInteractive);
       if (!pendingResult.complete) {
         console.error(
@@ -796,6 +814,7 @@ export async function pushCommand(
 
     if (entries.length === 0) {
       const emptyBatch: PendingUsageBatch = {
+        account_key: syncAccountKey(config),
         request: {
           protocol_version: 2,
           request_id: randomUUID(),
@@ -829,6 +848,7 @@ export async function pushCommand(
       migration: resolution.mode === "first_sync" || resolution.mode === "migration",
     });
     const batch: PendingUsageBatch = {
+      account_key: syncAccountKey(config),
       request,
       requested_dates: requestedDates,
       ...(automaticWatermarkDate ? { watermark_date: automaticWatermarkDate } : {}),

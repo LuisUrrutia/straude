@@ -36,6 +36,7 @@ export type PendingRangeMode =
   | "migration";
 
 export interface PendingUsageBatch {
+  account_key: string;
   request: UsageSubmitRequestV2;
   requested_dates: string[];
   /** Last date proven contiguous for automatic-sync watermark advancement. */
@@ -139,6 +140,7 @@ function parseOutbox(value: unknown): OutboxState | null {
   for (const candidate of record.batches) {
     if (typeof candidate !== "object" || candidate === null || Array.isArray(candidate)) return null;
     const batch = candidate as Record<string, unknown>;
+    if (typeof batch.account_key !== "string" || !/^[a-f0-9]{64}$/.test(batch.account_key)) return null;
     const parsedRequest = parseUsageSubmitV2(batch.request);
     if (!parsedRequest.ok) return null;
     if (
@@ -175,6 +177,7 @@ function parseOutbox(value: unknown): OutboxState | null {
       return null;
     }
     batches.push({
+      account_key: batch.account_key,
       request: parsedRequest.value,
       requested_dates: requestedDates,
       ...(typeof batch.watermark_date === "string"

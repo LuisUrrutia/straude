@@ -104,7 +104,7 @@ beforeEach(() => {
   recorded = [];
   plan = [];
   mockUpdateConfig.mockReset();
-  mockUpdateConfig.mockImplementation((updater) => updater(null));
+  mockUpdateConfig.mockImplementation((updater) => updater(configFor()));
   mockIsInteractive.mockReset();
   mockIsInteractive.mockReturnValue(false);
   setAuthRefreshStrategy(null);
@@ -116,8 +116,12 @@ afterEach(() => {
   expect(plan).toHaveLength(0);
 });
 
+function testToken(sub = "alice", iat = 1): string {
+  return `header.${Buffer.from(JSON.stringify({ sub, iat })).toString("base64url")}.signature`;
+}
+
 function configFor(): StraudeConfig {
-  return { token: "tok-abc", username: "alice", api_url: baseUrl };
+  return { token: testToken(), username: "alice", api_url: baseUrl };
 }
 
 describe("apiRequest — wire format", () => {
@@ -131,7 +135,7 @@ describe("apiRequest — wire format", () => {
   it("sends a real Bearer token in the Authorization header", async () => {
     plan.push({ status: 200, body: {} });
     await apiRequest(configFor(), "/api/test");
-    expect(recorded[0]!.headers.authorization).toBe("Bearer tok-abc");
+    expect(recorded[0]!.headers.authorization).toBe(`Bearer ${testToken()}`);
   });
 
   it("sends Content-Type: application/json", async () => {
@@ -223,6 +227,24 @@ describe("apiRequest — sliding token refresh", () => {
     );
   });
 
+  it("preserves a concurrent login when an earlier account's refresh response arrives", async () => {
+    const other = { ...configFor(), token: testToken("bob"), username: "bob" };
+    mockUpdateConfig.mockImplementation((updater) => updater(other));
+    plan.push({ status: 200, body: { ok: true }, delayMs: 20,
+      headers: { [REFRESHED_TOKEN_HEADER]: testToken("alice", 2) } });
+    const result = await apiRequest(configFor(), "/api/test");
+    expect(result).toEqual({ ok: true });
+    expect(other.token).toBe(testToken("bob"));
+    expect(mockUpdateConfig.mock.results[0]!.type).toBe("throw");
+  });
+
+  it("does not recreate signed-out config from an in-flight response", async () => {
+    mockUpdateConfig.mockImplementation((updater) => updater(null));
+    plan.push({ status: 200, body: {}, headers: { [REFRESHED_TOKEN_HEADER]: testToken("alice", 2) } });
+    await expect(apiRequest(configFor(), "/api/test")).resolves.toEqual({});
+    expect(mockUpdateConfig.mock.results[0]!.type).toBe("throw");
+  });
+
   it("does not save when the refresh header is absent", async () => {
     plan.push({ status: 200, body: {} });
     await apiRequest(configFor(), "/api/test");
@@ -239,7 +261,7 @@ describe("apiRequest — sliding token refresh", () => {
     plan.push({ status: 200, body: {} });
     await apiRequest(cfg, "/api/first");
     await apiRequest(cfg, "/api/second");
-    expect(recorded[0]!.headers.authorization).toBe("Bearer tok-abc");
+    expect(recorded[0]!.headers.authorization).toBe(`Bearer ${testToken()}`);
     expect(recorded[1]!.headers.authorization).toBe("Bearer rotated-1");
   });
 
@@ -276,7 +298,7 @@ describe("apiRequest — silent re-auth on 401", () => {
   it("retries once after the refresh strategy resolves a fresh config", async () => {
     mockIsInteractive.mockReturnValue(true);
     const refreshStrategy = vi.fn(async () => ({
-      token: "fresh-token",
+      token: testToken("alice", 2),
       username: "alice",
       api_url: baseUrl,
     }));
@@ -289,8 +311,16 @@ describe("apiRequest — silent re-auth on 401", () => {
     const result = await apiRequest<{ data: string }>(cfg, "/api/test");
     expect(result.data).toBe("ok");
     expect(refreshStrategy).toHaveBeenCalledTimes(1);
-    expect(recorded[1]!.headers.authorization).toBe("Bearer fresh-token");
-    expect(cfg.token).toBe("fresh-token");
+    expect(recorded[1]!.headers.authorization).toBe(`Bearer ${testToken("alice", 2)}`);
+    expect(cfg.token).toBe(testToken("alice", 2));
+  });
+
+  it("does not replay an expired account's mutation after signing into another account", async () => {
+    mockIsInteractive.mockReturnValue(true);
+    setAuthRefreshStrategy(async () => ({ ...configFor(), token: testToken("bob"), username: "bob" }));
+    plan.push({ status: 401, body: { error: "Unauthorized" } });
+    await expect(apiRequest(configFor(), "/api/usage/submit", { method: "POST", body: "{}" })).rejects.toThrow(/Session expired/);
+    expect(recorded).toHaveLength(1);
   });
 
   it("throws the original error when the strategy resolves null", async () => {
@@ -326,7 +356,7 @@ describe("apiRequest — silent re-auth on 401", () => {
   it("propagates a second 401 if the retried request also fails auth", async () => {
     mockIsInteractive.mockReturnValue(true);
     setAuthRefreshStrategy(async () => ({
-      token: "still-bad",
+      token: testToken("alice", 3),
       username: "alice",
       api_url: baseUrl,
     }));

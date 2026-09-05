@@ -369,6 +369,28 @@ describe("pushCommand v2", () => {
     );
   });
 
+  it("reports a rejected snapshot and leaves the automatic watermark unchanged", async () => {
+    apiRequestMock.mockImplementation(async (_config, path, options) => {
+      if (path === "/api/cli/dashboard") throw new Error("dashboard unavailable");
+      const body = JSON.parse(options.body);
+      return {
+        request_id: body.request_id,
+        outcomes: body.entries.map((entry: { date: string }) => ({
+          date: entry.date,
+          status: "permanent_error",
+          error: {
+            code: "usage_regression_rejected",
+            message: "Restore complete local logs and retry this date.",
+          },
+        })),
+      };
+    });
+    expect(await pushCommand({})).toBe(CLI_EXIT.PERMANENT);
+    expect(updateConfigMock).not.toHaveBeenCalled();
+    expect(pendingBatches).toEqual([]);
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining("usage_regression_rejected"));
+  });
+
   it("keeps only retryable dates and caps their future watermark before a permanent gap", async () => {
     loadConfigMock.mockReturnValue(config({ last_push_date: "2026-03-10" }));
     collectMock.mockResolvedValue(collected([
@@ -441,6 +463,40 @@ describe("pushCommand v2", () => {
       maxRetries: 0,
       acceptedStatuses: [400, 409, 503],
     });
+  });
+
+  it("leaves another account's outbox untouched", async () => {
+    apiRequestMock.mockImplementationOnce(async (_config, _path, options) => {
+      const body = JSON.parse(options.body);
+      return outcome(body.request_id, body.entries[0].date, "retryable_error");
+    });
+    await pushCommand({});
+    // Save a separate owner's batch and prove this login never transmits it.
+    const foreign = { ...(upsertBatchMock.mock.calls[0]![0]), account_key: "f".repeat(64) };
+    pendingBatches.splice(0, pendingBatches.length, foreign);
+    apiRequestMock.mockClear();
+    await pushCommand({});
+    expect(pendingBatches).toContainEqual(foreign);
+    const submitted = apiRequestMock.mock.calls.filter(([, path]) => path === "/api/usage/submit");
+    expect(submitted).toHaveLength(1);
+    expect(JSON.parse(submitted[0]![2].body).request_id).not.toBe(foreign.request.request_id);
+  });
+
+  it("does not replay the durable outbox during dry-run", async () => {
+    await pushCommand({});
+    pendingBatches.push(upsertBatchMock.mock.calls[0]![0]);
+    apiRequestMock.mockClear();
+    removeBatchMock.mockClear();
+    expect(await pushCommand({ dryRun: true })).toBe(CLI_EXIT.OK);
+    expect(apiRequestMock).not.toHaveBeenCalled();
+    expect(removeBatchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not advance another account's config when login changes during sync", async () => {
+    const other = config({ token: "other-token", username: "bob" });
+    updateConfigMock.mockImplementation((updater) => updater(other));
+    expect(await pushCommand({})).toBe(CLI_EXIT.OK);
+    expect(updateConfigMock.mock.results[0]!.value).toEqual(other);
   });
 
   it("renders only the newly collected local payload during dry-run", async () => {

@@ -78,8 +78,8 @@ export const posthog: PostHog = apiKey
       flushAt: 1,
       flushInterval: 0,
       // Raw exception messages and stacks can contain paths, hostnames, or
-      // collector stderr. Straude sends only allowlisted error codes and a
-      // one-way stable fingerprint through telemetry.ts.
+      // collector stderr. telemetry.ts sends allowlisted diagnostics and a
+      // fresh sanitized Error for Error Tracking, plus a one-way fingerprint.
       enableExceptionAutocapture: false,
       before_send: beforeSend,
     })
