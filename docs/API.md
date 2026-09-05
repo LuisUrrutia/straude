@@ -374,8 +374,8 @@ imports are adapted server-side during the migration.
   committed outcomes. Stable request IDs and entry hashes make retries
   idempotent.
 - **Legacy cutoff**: Protocol v1 is routed through the same transactional
-  function until `2026-08-06` by default (override with
-  `STRAUDE_USAGE_V1_CUTOFF`). After the cutoff it receives `426` with the exact
+  function until an operator configures `STRAUDE_USAGE_V1_CUTOFF=YYYY-MM-DD`
+  after publishing the compatible CLI and verifying adoption. After the cutoff it receives `426` with the exact
   update command `npx straude@latest`.
 
 ### `GET /api/usage/devices`
