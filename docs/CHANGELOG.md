@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **Favicon integration failures report the cache query error.** Assert the Supabase response and stored path without dereferencing a possibly missing cache row.
+
 - **Deferred command palette loading preserves page state.** Mount the palette alongside the page instead of wrapping it after idle loading. Early settings edits and focus now survive palette initialization, and the command shortcut remains available while its module loads.
 
 - **CI browser tests use the running local Supabase stack.** Generate the web environment before building so the browser bundle, server and authenticated E2E fixtures share valid local credentials instead of placeholders.

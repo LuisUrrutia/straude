@@ -64,8 +64,9 @@ describe("team favicon save with real database and Storage", () => {
     const bytes = await stored.text();
     expect(bytes).toContain('viewBox="0 0 200 100"');
     expect(bytes).not.toContain("onclick");
-    const { data } = await db.from("team_favicon_cache").select("*").eq("domain", domains[0]).single();
-    expect(data.object_path).toBe(`${domains[0]}.svg`);
+    const { data, error } = await db.from("team_favicon_cache").select("*").eq("domain", domains[0]).single();
+    expect(error).toBeNull();
+    expect(data).toMatchObject({ object_path: `${domains[0]}.svg` });
 
     remote.fetch.mockClear();
     await db.from("team_favicon_cache").delete().eq("domain", domains[0]);
