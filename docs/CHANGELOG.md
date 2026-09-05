@@ -4,7 +4,7 @@
 
 ### Changed
 
-- **Team favicons come directly from organization sites.** Discovery prefers sanitized SVG from conventional paths, HTML icon links and web manifests. Raster images, including PNG- and BMP-backed ICO entries, become lossless PNG output inside 128×128 without enlargement or cropping. Downloads validate public IP destinations and pin each connection to its checked address, with bounded redirects, concurrency, bytes and deadlines.
+- **Team favicons come directly from organization sites.** Discovery prefers sanitized SVG from conventional paths, HTML icon links and web manifests. Raster images, including PNG- and BMP-backed ICO entries, become lossless PNG output inside 128×128 without enlargement or cropping. Downloads validate public IP destinations and pin each connection to its checked address, with bounded redirects, concurrency, bytes and deadlines. Reusing a downloaded URL preserves the byte limit of each consuming resource.
 - **Team favicon caching supports SVG, PNG and temporary misses.** A service-only `team_favicon_cache` table persists object paths and 15-minute retry times across requests. Existing PNG objects remain valid. Settings saves retain an unchanged team's resolved icon. The team field waits for hydration before accepting edits, preventing early text entry from being lost. Badges use direct Storage images with `object-fit: contain` so prepared PNGs avoid optimizer recompression.
 
 ### Added

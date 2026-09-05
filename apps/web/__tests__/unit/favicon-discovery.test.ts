@@ -76,4 +76,14 @@ describe("favicon discovery", () => {
     expect(fixture.paths().filter((path) => /\d+\.svg$/.test(path))).toHaveLength(12);
     expect(fixture.paths()).not.toContain("https://example.com/og.svg");
   });
+
+  it("applies the document byte cap when reusing an earlier image response", async () => {
+    const fixture = site({
+      "/": '<link rel="manifest" href="/favicon.svg">',
+      "/favicon.svg": JSON.stringify({ padding: "x".repeat(524_288), icons: [{ src: "/from-manifest.svg" }] }),
+      "/from-manifest.svg": vector,
+    });
+    expect(await discoverWithFetch(origin, fixture.fetch)).toBeNull();
+    expect(fixture.paths()).not.toContain("https://example.com/from-manifest.svg");
+  });
 });

@@ -112,7 +112,7 @@ export async function discoverWithFetch(origin: URL, fetch: FaviconFetch, cancel
       pending = fetch(url, limit).catch(() => null);
       fetched.set(url.href, pending);
     }
-    return pending;
+    return pending.then((response) => response && response.bytes.length <= limit ? response : null);
   };
   const image = async (url: URL) => {
     const response = await get(url, MAX_ICON_BYTES);
