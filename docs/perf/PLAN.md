@@ -1,26 +1,101 @@
-# Straude Performance Mission: every core page < 500ms
+# Authenticated page performance review
 
-> Review update (2026-09-04): July measurements below are historical. The reviewed
-> revision preserves server-confirmed auth, reads live leaderboards, and uses only
-> request-level sidebar deduplication. Those earlier numbers are not current proof.
-> See `docs/DECISIONS.md` for the current data and performance contract.
+## Current behavior and acceptance (2026-09-04)
 
-## Milestone status
+The reviewed change renders initial settings, search, card, and recap data on the
+server. It removes duplicate post/profile work and batches message attachment
+signing. Auth keeps server-confirmed `getUser()` checks. Leaderboard listings and
+ranks stay live, and radar snapshots fall back to the previous live calculation
+when missing, unavailable, or older than 20 minutes.
 
-- [x] M0 harness — acceptance: `bun run perf` scorecard for all 10 pages; `BASELINE.md` ready for the owner commit
-- [ ] M1 PostHog RUM — code/docs complete; post-deploy `$web_vitals` acceptance remains non-gating
-- [x] M2 auth consolidation — acceptance: TTFB drop; no direct `auth.getUser()` in (app); tests green
-- [x] M3 waterfalls/duplicates — completed with M4/M5 before the final scorecard; tests green
-- [x] M4 DB layer — snapshots live; EXPLAIN and advisor comparison clean
-- [x] M5 server caching — public snapshot reads cached; private/user-scoped data remains request-scoped; leakage tests green
-- [x] M6 rendering/bundle — loading shells, server initial data, and analyzer baseline complete
-- [x] M7 goal loop — two consecutive clean-checkout `perf:check` runs passed 10/10
+Search deep links and the API share one validated filter. Editing the search box
+issues one API request and changes the URL without a second server navigation.
+Settings saves preserve the browser timezone fallback. Regional ranks require an
+entry in the selected region.
 
-## Latest scorecard
+The right-sidebar API keeps main's existing live implementation. The proposed
+candidate-loader became slower after persistent caching was removed, so it was
+removed. Public privacy changes take effect on the next request. No shared
+sidebar cache remains.
 
-Captured 2026-07-18 at 17:16 after M3-M6, the live snapshot migrations, and
-the second consecutive clean-checkout goal run. Targets: TTFB <300ms and LCP
-<500ms. All 10 pages pass both local gates.
+Acceptance means useful initial data, working interactions, unchanged auth and
+privacy boundaries, regression tests, and green CI. The old all-pages-under-500ms
+target is not the current result. Production p75 performance remains unverified.
+
+## Current local comparison
+
+Baseline: `main` at `7ee21a7`. Candidate: `b01634a`, followed by restoring main's
+sidebar implementation. The subsequent `3f82ac0` main merge changes CLI source
+support and product wording; the table measures the named earlier commits.
+
+Both used a production build, Next.js 16.2.6, Chromium 145 (Playwright 1.58.2),
+the same isolated Supabase instance, and the same three local fixture users.
+The two demo accounts have 21 days of usage each. Each route used five full
+navigations; the first was discarded and the last four were summarized by their
+median. TTFB and LCP below are milliseconds. The 1.5-second LCP observation
+window and all measurement code matched across branches.
+
+The candidate ran first, then main, then a confirming candidate run. The baseline
+copied only the harness/config into a detached worktree; product code was
+unchanged. Main has no perf timing marker, so its guard checked `#main-content`,
+HTTP success, the exact URL, and a successful authenticated profile API request.
+Both branches passed all 12 functional harness checks.
+
+| Route | Main TTFB | PR TTFB | Main LCP | PR LCP | LCP difference |
+|---|---:|---:|---:|---:|---:|
+| `/feed` | 103 | 94 | 192 | 194 | +2 |
+| `/leaderboard` | 85 | 90 | 544 | 412 | -132 |
+| `/u/[username]` | 110 | 92 | 220 | 186 | -34 |
+| `/post/[id]` | 109 | 89 | 214 | 178 | -36 |
+| `/notifications` | 95 | 91 | 546 | 560 | +14 |
+| `/messages` | 89 | 84 | 554 | 546 | -8 |
+| `/prompts` | 87 | 89 | 554 | 542 | -12 |
+| `/recap` | 77 | 92 | 690 | 562 | -128 |
+| `/settings` | 79 | 87 | 644 | 174 | -470 |
+| `/search` | 81 | 89 | 522 | 428 | -94 |
+
+Settings improved from 644ms to 174ms LCP; search from 522ms to 428ms; recap from
+690ms to 562ms. Feed was effectively unchanged at 192ms versus 194ms. The
+confirming candidate met the historical threshold on 6/10 routes; main met it on
+3/10. Notifications, messages, prompts, and recap still exceed 500ms.
+
+The first candidate run was slower on feed and leaderboard, but those differences
+disappeared in the confirming run. The sidebar regression persisted: main's API
+median was 65ms, versus 120ms and 150ms in the two candidate runs. That experiment
+was rejected and main's implementation restored. The restored route is measured
+separately below; the slower version is not part of the final implementation.
+
+Restored-sidebar recheck: 79ms median across four warm requests (117, 84, 74,
+65ms; the 349ms initial request was discarded). This is close to the 65ms main
+baseline and materially below the rejected 150ms result. Small remaining timing
+differences are not evidence of an implementation change: the route now matches
+main exactly.
+
+These are small local samples with host scheduling and paint variability. They
+are evidence for the tested fixture, not a production percentile or a promise
+that every route is faster. No current bundle-size saving was measured.
+
+## Functional verification
+
+The local production walkthrough saved and reloaded a changed display name,
+verified initial search results and one API request with zero duplicate RSC
+requests after an edit, and hid then restored a profile after warming the
+leaderboard/sidebar. The next reads reflected each privacy change. No browser
+runtime errors were observed. The temporary fixture edits were restored.
+
+Remote Supabase tests require explicit `PERF_ALLOW_REMOTE=1`. Auth state and
+scorecard outputs remain ignored. The review used only the isolated local stack.
+Current tests, build, CI, and final structured-review results are recorded in the
+pull request closeout.
+
+## Historical July 18 evidence (superseded implementation)
+
+The July milestones recorded a claims-only auth gate, persistent snapshot caches,
+and two passing local timing runs. Those implementation choices and completion
+criteria are historical. They do not describe this review's final code or authorize
+new deployments, database changes, scheduled work, or continuation of that plan.
+
+The original July scorecard recorded these values:
 
 | Page | TTFB | FCP | LCP | Server-Timing | Layout attribution | Pass |
 |---|---:|---:|---:|---|---|:---:|
@@ -35,148 +110,7 @@ the second consecutive clean-checkout goal run. Targets: TTFB <300ms and LCP
 | `/settings` | 43ms | 100ms | 444ms | mw-auth:1ms | layoutAuth:2ms layoutProfile:36ms | PASS |
 | `/search` | 37ms | 92ms | 430ms | mw-auth:0ms | layoutAuth:1ms layoutProfile:31ms | PASS |
 
-Right-sidebar API: 30ms. **10/10 pages passing.** The immediately preceding
-clean run at 17:15 also passed 10/10 (TTFB 33-43ms, LCP 88-466ms, sidebar
-30ms). The original pre-M2 baseline and full method notes are in
-[`BASELINE.md`](BASELINE.md).
-
-A third independent verification run at 22:07 UTC (fresh session, clean tree)
-also passed 10/10: TTFB 35-46ms, LCP 96-492ms, sidebar 29ms. Note the LCP
-margin is thin (most pages 440-490ms against the 500ms gate) — regressions of
-even ~50ms on the client render path will trip the gate, which is intended.
-
-
-## Context
-
-Every authenticated page currently takes a couple of seconds to load. Vercel Speed Insights costs $10/mo and we won't pay it, so we build our own free measurement stack (Playwright lab harness + PostHog RUM) and then optimize until every authenticated page passes. This plan is the long-horizon goal spec: it will be copied into `docs/perf/PLAN.md` as the cross-session tracker, and the lab scorecard (`bun run perf:check`) is the falsifiable goal check Claude runs each session.
-
-**Why pages are slow (verified in code):**
-1. **Auth validated 2–4× per navigation**, each a network round trip to Supabase: `proxy.ts` → [middleware.ts:68](apps/web/lib/supabase/middleware.ts) `getUser()`, then [app/(app)/layout.tsx:219](apps/web/app/(app)/layout.tsx) `getAuthUser()` (separate scope, not deduped), then 6 pages call `auth.getUser()` directly (recap, messages, post/[id], prompts, notifications).
-2. **Layout blocks all children** on a profile `.single()` fetch ([layout.tsx:242-246](apps/web/app/(app)/layout.tsx)).
-3. **Leaderboards are plain views** (matviews were dropped in migration `20260218224043`) doing full `GROUP BY` aggregations over `daily_usage` on every read — and the right-sidebar API hits `leaderboard_weekly` on **every** authenticated page. No covering index for the aggregation.
-4. **Zero cross-request caching** in the authenticated app: no `unstable_cache`, no `"use cache"`, no tags. Only `React cache()` on `getAuthUser`.
-5. **Waterfalls & duplicates**: `enrichFeedPosts` awaited after `get_feed` (feed + profile); profile page does 13 queries incl. 2–3 redundant full `daily_usage` scans; [lib/radar.ts](apps/web/lib/radar.ts) full-table-scans 5 tables per profile view (5-min per-instance cache only); `calculate_user_streak` RPC loops one query per streak day; messages page double-preloads conversations and signs URLs per message; post/[id] double-fetches auth + post via `generateMetadata`.
-6. **No measurement tooling at all**: no web-vitals, no Server-Timing, no bundle analyzer, no perf tests.
-
-## Definition of done (user-approved)
-
-| Metric | Target | How measured |
-|---|---|---|
-| Server TTFB | < 300 ms | Lab harness: Playwright vs local prod build (`next build` + `next start`, prod Supabase), median of 5 warm runs (discard run 1) |
-| LCP | < 500 ms | Same harness |
-| RUM p75 TTFB / LCP | < 500 ms / < 1 s | PostHog web vitals — tracked as honesty check, **not gating** |
-
-**Gating pages (ALL authenticated):** `/feed`, `/leaderboard`, `/u/[username]`, `/post/[id]`, `/notifications`, `/messages`, `/prompts`, `/recap`, `/settings`, `/search`. The mission is complete when `bun run perf:check` exits 0 (every gating page under target) and the result is reproducible on a second run.
-
-**User-approved infrastructure decisions:**
-- Migrate Supabase project `kanfzeovbmusnhmbnhit` to **asymmetric JWT signing keys** so middleware can verify tokens locally via `getClaims()` (regression-test CLI auth after).
-- Enable **pg_cron** in Supabase to refresh leaderboard snapshots (~every 10 min).
-
-## Milestones
-
-Each milestone is independently committable; record scorecard-before/after in `docs/perf/PLAN.md` per milestone. Order matters: measure first.
-
-### M0 — Lab measurement harness (no app changes)
-- `apps/web/e2e/perf/auth.setup.ts`: authenticated Playwright fixture. Seed/create a perf test user (`PERF_TEST_EMAIL`/`PERF_TEST_PASSWORD` in `.env.local`, added to `.env.example`), sign in via login form or programmatic `signInWithPassword` → storageState.
-- `apps/web/e2e/perf/pages.perf.spec.ts`: for each gating page, collect TTFB (`navigation.responseStart`), FCP (paint entries), LCP (buffered PerformanceObserver); 5 iterations, discard first, report median. Also measure `/api/app/right-sidebar` response time.
-- `apps/web/e2e/perf/scorecard.ts`: writes `perf-results/scorecard.{json,md}` (gitignored) with pass/fail per page; **non-zero exit on any failure**.
-- `apps/web/playwright.perf.config.ts`: `workers: 1`, no retries, `webServer: { command: "bun run start" }` (build separately) — use Playwright's webServer, not shell backgrounding.
-- Scripts: `perf` (build + run harness), `perf:check` (the goal-loop command).
-- **Server-Timing headers**: instrument `proxy.ts` (auth duration) and `app/(app)/layout.tsx` (auth, profile fetch) so the harness attributes TTFB; read via `navigation.serverTiming`.
-- Commit `docs/perf/BASELINE.md` with the first scorecard, and create `docs/perf/PLAN.md` from this plan.
-- **Acceptance:** `bun run perf` produces a scorecard with baseline numbers for all 10 pages.
-
-### M1 — RUM via PostHog (free)
-- Enable web-vitals capture in [PostHogProvider.tsx](apps/web/components/providers/PostHogProvider.tsx) — verify the current posthog-js option name against docs (likely `capture_performance: { web_vitals: true }`); stays behind the existing consent gate. Optionally add `useReportWebVitals` forwarding for App Router soft navigations (keep only one path if double-counting).
-- `docs/perf/RUM.md`: the PostHog query/insight for p75 TTFB/LCP per pathname.
-- **Acceptance:** `$web_vitals` events visible in PostHog after deploy.
-
-### M2 — Auth consolidation (highest-leverage server win)
-- Migrate project to asymmetric JWT signing keys (Supabase dashboard); verify CLI auth (`cli_auth_codes` flows) still works.
-- Middleware: replace `getUser()` with `getClaims()` (local JWKS verification) in [lib/supabase/middleware.ts](apps/web/lib/supabase/middleware.ts). Verify current @supabase/ssr guidance first (supabase-js is 2.108.1).
-- Extend [lib/supabase/auth.ts](apps/web/lib/supabase/auth.ts) into a `cache()`d `getAuthContext()` returning `{ user, profile }` in one fetch; use it in the app layout (replacing the L219 + L242 pair) and in the 6 pages calling `auth.getUser()` directly.
-- post/[id]: wrap post fetch in `React cache()` so `generateMetadata` + page share one fetch/auth.
-- **Acceptance:** scorecard TTFB drop across all pages; `grep -rn "auth.getUser()" "apps/web/app/(app)"` empty outside the helper; golden-path e2e + `migration-safety.test.ts` green.
-
-### M3 — Kill waterfalls & duplicate queries (one commit per page)
-- Layout: dedupe `loadLatestPosts` (DeferredSidebar vs PhotoNudge) via a `cache()`d loader; keep all sidebar queries inside Suspense.
-- Profile [u/[username]/page.tsx](apps/web/app/(app)/u/[username]/page.tsx): fold `getProfileAccessContext`'s sequential follows lookup into the parallel batch; run `enrichFeedPosts` concurrently; redundant `daily_usage` scans collapse in M4.
-- Feed [feed/page.tsx:66](apps/web/app/(app)/feed/page.tsx): parallelize enrichment or fold counts into `get_feed` (must stay SECURITY DEFINER; keep redaction invariants that `migration-safety.test.ts` enforces).
-- Messages: remove second sequential `preloadConversation`; batch signed URLs via `createSignedUrls([...])`.
-- Leaderboard page: merge the two sequential query waves.
-- **Acceptance:** per-page scorecard deltas recorded; no page regresses; redaction tests green.
-
-### M4 — Database layer (migrations via Supabase MCP `apply_migration`, per memory)
-1. Covering index for leaderboard aggregation, e.g. `daily_usage(date, user_id) INCLUDE (cost_usd, output_tokens)` — validate with `EXPLAIN ANALYZE`.
-2. Leaderboard snapshots: replicate the `open_stats_snapshots` JSONB pattern ([lib/open-stats.ts](apps/web/lib/open-stats.ts)); refresh via **pg_cron** every ~10 min; keep views as fallback; drop vestigial `refresh_leaderboards()` + `idx_leaderboard_*`.
-3. Rewrite `calculate_user_streak` set-based (gaps-and-islands, mirroring `calculate_streaks_batch`) — it's called on every sidebar render.
-4. New `get_profile_stats(user_id)` RPC: totals + contributions + radar inputs in one scan; replace [lib/radar.ts](apps/web/lib/radar.ts) full-table `getDistributions()` (fold distributions into the snapshot refresh).
-- **Invariant:** any RPC reading non-public `users` columns (timezone, onboarding_completed, streak_freezes) must be SECURITY DEFINER — INVOKER RPCs silently fail under the column grants.
-- **Acceptance:** EXPLAIN before/after captured; `/leaderboard` + `/u/[username]` scorecard deltas; `migration-safety.test.ts` green; Supabase advisors clean.
-
-### M5 — Server-side caching
-- `unstable_cache` (+ tags, 60–300 s revalidate) around: right-sidebar loader (`app/api/app/right-sidebar`), leaderboard snapshot reads, radar reads. Default to `unstable_cache`; only consider `"use cache"`/`cacheComponents` after verifying Next 16 stability.
-- **Never** shared-cache per-user data (feed, messages, notifications) — request-scoped `cache()` only. Add an integration test asserting no user-scoped data in shared cache keys.
-- **Acceptance:** right-sidebar timing in scorecard; leakage test green.
-
-### M6 — Rendering & client bundle
-- Ensure every gating page has `loading.tsx`/Suspense shell (currently only feed, leaderboard, post/[id], u/[username] have one).
-- Add `@next/bundle-analyzer` behind `ANALYZE=1`; baseline in `docs/perf/bundles.md`; dynamic-import route-specific heavy deps (recharts, kbar, react-markdown, heic libs). `optimizePackageImports` already covers lucide/motion/recharts.
-- Client-fetch pages (`/settings`, `/search`, `/card`) currently fetch in `useEffect` — move to server components or stream data to hit LCP targets.
-- **Acceptance:** first-load JS per route in analyzer report; FCP/LCP scorecard deltas.
-
-### M7 — Goal loop & regression guard
-- `bun run perf:check` is the per-session goal check: run it, paste the scorecard into `docs/perf/PLAN.md`, work the worst failing page next.
-- Optional: `@lhci/cli` in GitHub Actions for public pages (authed scorecard stays local — needs secrets).
-- **Acceptance:** two consecutive `perf:check` passes on a clean checkout → mission complete; update `docs/CHANGELOG.md` + `docs/DECISIONS.md` (JWT keys, pg_cron, snapshot pattern).
-
-## Current state snapshot (as of 2026-07-18, local performance gate passing)
-
-- **Local result:** consecutive 17:15 and 17:16 production-build harness runs
-  each completed 12/12 Playwright checks with all 10 authenticated pages below
-  both gates. The second run measured TTFB at 35-44ms, LCP at 98-466ms, and
-  the right-sidebar median at 30ms.
-- **Auth:** asymmetric ES256 signing plus `getClaims()` reduced middleware auth
-  attribution from 25-30ms to 0-1ms while preserving authenticated behavior.
-- **M3-M5:** waterfall/query deduplication and the private, service-only
-  leaderboard/profile snapshot pattern were completed together before the
-  final scorecard. Public snapshot reads use bounded shared caching; per-user
-  data is not shared-cached. The live pg_cron job refreshes snapshots every
-  10 minutes. Production verification found 355 leaderboard rows and 561
-  profile-stat rows; advisors returned to the exact pre-change baseline.
-- **M6:** every gating route has a loading boundary, initial settings/search/
-  card/recap data is server-rendered, and bundle analysis removed about 39 KiB
-  gzip of development-only JavaScript from each authenticated route.
-- **Remaining check:** after deploy, confirm PostHog `$web_vitals` for M1. RUM
-  is an honesty check and does not gate the completed local mission.
-
-## Implementation notes
-
-- The proxy exposes middleware auth duration through the standard
-  `Server-Timing` header and the harness reads it from
-  `PerformanceNavigationTiming.serverTiming`.
-- App Router Server Components cannot mutate the response headers after the
-  proxy returns. Layout auth/profile durations therefore use a perf-only JSON
-  marker in the rendered document. The scorecard keeps this in a separate
-  `Layout attribution` column instead of mislabeling it as `Server-Timing`.
-- Generated scorecards, Playwright artifacts, and auth storage state are
-  gitignored under `apps/web/perf-results/` and `apps/web/e2e/perf/.auth/`.
-
-## Cross-session protocol
-
-On session start: read `docs/perf/PLAN.md`, check milestone status against `git log`, run `bun run perf:check`, resume at the first incomplete milestone or the worst failing page. Commit after every milestone (small commits to `main` per repo convention). Keep `implementation-notes.md` deviations logged in `docs/perf/PLAN.md`.
-
-**Interruption safety (user-directed):**
-- Commit early and often — uncommitted progress is the only kind that gets lost. Any time a sub-step is done and green, commit it. Update the "Current state snapshot" section of `docs/perf/PLAN.md` (what's done, exact next action) before any risky/long operation and at every milestone boundary.
-- **Session/usage limit handling:** if the session hits the usage limit before the performance target is met, read the limit-reset time from the Claude output, then schedule a wake-up message ("keep going") for 1 minute after the reset (scheduled-task/wakeup tooling) so the mission resumes automatically and runs to completion. On wake-up, follow the session-start protocol above.
-
-## API uncertainties — verify with docs (Context7/find-docs) before implementing, never guess
-- posthog-js web-vitals capture option name.
-- `getClaims()` prerequisites + current @supabase/ssr middleware guidance.
-- Next 16 `"use cache"`/`cacheComponents` status (default: `unstable_cache`).
-- Playwright `webServer` + `next start` (Turbopack build) interplay.
-
-## Verification
-- Every milestone: `bun run perf:check` delta + `bun test` + `tsc --noEmit` + golden-path e2e.
-- DB milestones additionally: `migration-safety.test.ts`, Supabase advisors, manual check that feed/profile render identically for a non-owner viewer (redaction).
-- RUM check ~1 week after M2/M4 land: PostHog p75 should corroborate lab wins; if lab passes but RUM p75 is far off, revisit the metric definition with Oscar.
+The July bundle analysis reported about 39 KiB gzip removed by keeping Agentation
+out of production imports. That measurement has not been repeated for the current
+merged dependency tree. See `BASELINE.md`, `DB.md`, `RUM.md`, and `bundles.md` for
+other explicitly historical evidence. The current design is in `docs/DECISIONS.md`.

@@ -2,7 +2,7 @@
 
 ## Preserve Live Privacy, Rank, and Auth Checks (2026-09-04)
 
-**Decision:** Deduplicate server identity, shell profiles, leaderboards, and sidebar candidates only within a request. Both middleware and the shared identity loader retain Supabase `getUser()`. Leaderboard listings and ranks read the existing live views, matching the CLI and profile readers.
+**Decision:** Deduplicate server identity, shell profiles, and leaderboards only within a request. Both middleware and the shared identity loader retain Supabase `getUser()`. Leaderboard listings and ranks read the existing live views, matching the CLI and profile readers.
 
 **Alternatives considered:** (a) Keep persistent snapshot caches and add freshness validation, live visibility filtering, and invalidation for every usage and privacy mutation. This saves aggregate reads but creates more cache ownership and can still disagree with live ranks. (b) Keep live views and request-only deduplication. Chosen: the historical SQL difference was about 2.5ms, while immediate first-sync ranks and privacy changes affect user trust.
 
@@ -20,7 +20,7 @@
 
 **Decision:** Render initial settings, search, card, and recap data on the server; keep subsequent interactions client-side. Give every authenticated gating route an accessible `loading.tsx` boundary. Run `@next/bundle-analyzer` only when `ANALYZE=1`, using its required webpack build while normal production builds remain on Turbopack.
 
-**Why:** Fetch-on-mount delayed useful content and made placeholders the initial page state. Server initial data removes that waterfall, loading boundaries preserve responsive navigation, and the analyzer exposed a development-only Agentation import that cost every authenticated route about 39 KiB gzip.
+**Why:** Fetch-on-mount delayed useful content and made placeholders the initial page state. Server initial data removes that waterfall, loading boundaries preserve responsive navigation, and the July analyzer run exposed a development-only Agentation import. Its historical 39 KiB gzip measurement has not been repeated for current dependencies.
 
 **Tradeoff:** The actual useful page can become the LCP candidate, so a metric may rise from a trivial loading label even when the page is more usable. Heavy dependencies that were already correctly lazy-loaded remain unchanged.
 
@@ -32,7 +32,7 @@
 
 **Decision:** Keep the production-build Playwright measurement harness and optional `perf:check` thresholds. Before recording metrics, verify the target returns success, remains on the intended route, and has an authenticated application shell. Remote Supabase projects require explicit `PERF_ALLOW_REMOTE=1`; default verification uses a local fixture.
 
-**Evidence boundary:** The July scorecards describe the earlier claims-only authentication and persistent snapshot-cache implementation. They do not prove performance of this revision or a production p75 result. Compare current main and this revision using the same runtime, seed, and browser before claiming a numerical improvement. PostHog web vitals remain a post-deploy check.
+**Evidence boundary:** The July scorecards describe the earlier claims-only authentication and persistent snapshot-cache implementation. They do not prove performance of this revision or a production p75 result. The current comparison in `docs/perf/PLAN.md` uses the same runtime, seed, and browser for main and this revision. It does not establish a production percentile. PostHog web vitals remain a post-deploy check.
 
 ## Follow released ccusage source support through the unified collector (2026-09-04)
 
