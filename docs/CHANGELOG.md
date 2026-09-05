@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **CI browser tests use the running local Supabase stack.** Generate the web environment before building so the browser bundle, server and authenticated E2E fixtures share valid local credentials instead of placeholders.
+
 - **Do not delay declared SVG icons behind manifests.** Try known HTML SVG candidates first and return a usable vector without waiting for manifest downloads. Mislabeled raster results remain available while checking for a real SVG.
 
 - **Bound favicon download memory.** Direct requests share a 12 MiB body budget; the Google fallback has a separate 4 MiB allowance. Per-search deduplication stores prepared images and parsed candidates instead of keeping discarded image bodies alive.
