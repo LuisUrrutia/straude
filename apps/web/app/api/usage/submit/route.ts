@@ -16,6 +16,7 @@ import { after } from "@/lib/utils/after";
 import { captureServerActivationEvent } from "@/lib/analytics/server";
 import { createClient } from "@/lib/supabase/server";
 import { verifyCliTokenWithRefresh } from "@/lib/api/cli-auth";
+import { CliIdentityUnavailableError, isActiveCliUser } from "@/lib/api/active-cli-user";
 import { getServiceClient } from "@/lib/supabase/service";
 import { checkAndAwardAchievements } from "@/lib/achievements";
 import { rateLimit } from "@/lib/rate-limit";
@@ -152,6 +153,7 @@ async function readJsonBodyWithLimit(
 async function resolveAuthContext(request: Request): Promise<AuthContext | null> {
   const cliAuth = verifyCliTokenWithRefresh(request.headers.get("authorization"));
   if (cliAuth) {
+    if (!(await isActiveCliUser(cliAuth.userId))) return null;
     return {
       userId: cliAuth.userId,
       source: "cli",
@@ -619,7 +621,15 @@ export async function POST(request: Request): Promise<NextResponse> {
   const parsedBody = await readJsonBodyWithLimit(request, MAX_USAGE_BODY_BYTES);
   if (!parsedBody.ok) return parsedBody.response;
 
-  const auth = await resolveAuthContext(request);
+  let auth: AuthContext | null;
+  try {
+    auth = await resolveAuthContext(request);
+  } catch (error) {
+    if (error instanceof CliIdentityUnavailableError) {
+      return NextResponse.json({ error: "Identity verification unavailable" }, { status: 503 });
+    }
+    throw error;
+  }
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const v2 = isV2Request(parsedBody.body);

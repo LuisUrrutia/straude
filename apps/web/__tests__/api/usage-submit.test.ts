@@ -10,6 +10,11 @@ vi.mock("@/lib/api/cli-auth", () => ({
 
 const rpc = vi.fn();
 
+vi.mock("@/lib/api/active-cli-user", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api/active-cli-user")>();
+  return { ...actual, isActiveCliUser: vi.fn().mockResolvedValue(true) };
+});
+
 vi.mock("@/lib/supabase/service", () => ({
   getServiceClient: vi.fn(() => ({ rpc })),
 }));
@@ -18,6 +23,7 @@ vi.mock("@/lib/analytics/server", () => ({
   captureServerActivationEvent: vi.fn().mockResolvedValue(true),
 }));
 
+import { CliIdentityUnavailableError, isActiveCliUser } from "@/lib/api/active-cli-user";
 import { POST } from "@/app/api/usage/submit/route";
 import { createClient } from "@/lib/supabase/server";
 import { verifyCliTokenWithRefresh } from "@/lib/api/cli-auth";
@@ -98,6 +104,20 @@ beforeEach(() => {
 });
 
 describe("POST /api/usage/submit legacy adapter", () => {
+  it("returns 503 when CLI identity verification is unavailable", async () => {
+    vi.mocked(isActiveCliUser).mockRejectedValueOnce(new CliIdentityUnavailableError());
+    const res = await POST(request(legacyBody()));
+    expect(res.status).toBe(503);
+    expect(rpc).not.toHaveBeenCalledWith("submit_usage_day_v2", expect.anything());
+  });
+
+  it("rejects a deleted or banned CLI account", async () => {
+    vi.mocked(isActiveCliUser).mockResolvedValueOnce(false);
+    const res = await POST(request(legacyBody()));
+    expect(res.status).toBe(401);
+    expect(rpc).not.toHaveBeenCalledWith("submit_usage_day_v2", expect.anything());
+  });
+
   it("keeps the published v1 CLI working when no sunset is configured", async () => {
     vi.stubEnv("STRAUDE_USAGE_V1_CUTOFF", "");
     const response = await POST(request(legacyBody()));
