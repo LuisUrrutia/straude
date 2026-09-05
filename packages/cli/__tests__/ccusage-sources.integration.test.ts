@@ -25,7 +25,7 @@ const sources = [
 
 async function collect(sourceRoots: Record<string, string>) {
   const { stdout, stderr } = await runBundledCcusage(
-    ["daily", "--json", "--since", "20260709", "--until", "20260709", "--offline"],
+    ["daily", "--json", "--by-agent", "--since", "20260709", "--until", "20260709", "--offline"],
     fixtureHome,
     sourceRoots,
   );
@@ -48,7 +48,7 @@ describe("released ccusage sources", () => {
     expect(usage.data[0]).toMatchObject({ date: "2026-07-09", agents: [agent], models: [model], ...tokens });
     expect(usage.collector).toEqual({ ccusage_version: bundledCcusageVersion, ccusage_agents: [agent], pricing_mode: "offline" });
     expect(usage.data[0]!.costUSD).toBeGreaterThan(0);
-    expect(usage.data[0]!.modelBreakdown).toEqual([{ model, cost_usd: usage.data[0]!.costUSD }]);
+    expect(usage.data[0]!.modelBreakdown).toEqual([expect.objectContaining({ model, cost_usd: usage.data[0]!.costUSD })]);
     if (agent === "grok") expect(usage.data[0]!.costUSD).toBeCloseTo(0.0123, 10);
   });
 

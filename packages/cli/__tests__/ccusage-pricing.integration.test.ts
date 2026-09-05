@@ -25,7 +25,7 @@ function comparableVersion(version: string): number {
 describe("bundled ccusage GPT-5.6 pricing", () => {
   it("logs Codex tokens and LiteLLM API spend for the complete GPT-5.6 family", async () => {
     const { stdout, stderr } = await runBundledCcusage(
-      ["daily", "--json", "--since", "20260709", "--until", "20260709", "--no-offline"],
+      ["daily", "--json", "--by-agent", "--since", "20260709", "--until", "20260709", "--no-offline"],
       fixtureHome,
       { CODEX_HOME: `${fixtureHome}/codex` },
     );
