@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Changed
+
+- **Team favicons come directly from organization sites.** Discovery prefers sanitized SVG from conventional paths, HTML icon links and web manifests. Raster images, including PNG- and BMP-backed ICO entries, become lossless PNG output inside 128×128 without enlargement or cropping. Downloads validate public IP destinations and pin each connection to its checked address, with bounded redirects, concurrency, bytes and deadlines.
+- **Team favicon caching supports SVG, PNG and temporary misses.** A service-only `team_favicon_cache` table persists object paths and 15-minute retry times across requests. Existing PNG objects remain valid. Settings saves retain an unchanged team's resolved icon. The team field waits for hydration before accepting edits, preventing early text entry from being lost. Badges use direct Storage images with `object-fit: contain` so prepared PNGs avoid optimizer recompression.
+
+### Added
+
+- **Repeatable favicon verification.** `bun run --cwd apps/web test:favicons` covers image processing, discovery, transport, cache, settings and badge behavior. The dedicated Supabase integration suite exercises real database/Storage writes; `e2e/team-favicon-save.spec.ts` verifies authenticated saves and browser rendering with temporary local fixtures. Apply `20260905120000_team_favicon_cache.sql` before deploying the resolver.
+
 ### CLI 0.2.0 hardening
 
 - **Versioned, retry-safe usage sync.** CLI and server now share a validated protocol-v2 envelope with stable request IDs, per-date content hashes, installation identity, collector provenance, and explicit per-date outcomes. The CLI writes batches to a durable outbox before submission, advances only contiguous committed dates, preserves unresolved work across crashes, and serializes overlapping scheduler or hook runs with a lock and date queue.
