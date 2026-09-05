@@ -9,9 +9,13 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 const rpc = vi.fn();
+const getUserById = vi.fn();
 
 vi.mock("@/lib/supabase/service", () => ({
-  getServiceClient: vi.fn(() => ({ rpc })),
+  getServiceClient: vi.fn(() => ({
+    rpc,
+    auth: { admin: { getUserById } },
+  })),
 }));
 
 import { GET } from "@/app/api/usage/devices/route";
@@ -53,6 +57,10 @@ function webSession(userId: string | null) {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(verifyCliTokenWithRefresh).mockReturnValue(null);
+  getUserById.mockResolvedValue({
+    data: { user: { id: "cli-user", banned_until: null } },
+    error: null,
+  });
   webSession(null);
 });
 
@@ -74,6 +82,7 @@ describe("GET /api/usage/devices", () => {
       p_user_id: "cli-user",
     });
     expect(createClient).not.toHaveBeenCalled();
+    expect(getUserById).toHaveBeenCalledWith("cli-user");
   });
 
   it("supports an authenticated web session", async () => {
@@ -87,6 +96,7 @@ describe("GET /api/usage/devices", () => {
     expect(rpc).toHaveBeenCalledWith("list_usage_device_candidates", {
       p_user_id: "web-user",
     });
+    expect(getUserById).not.toHaveBeenCalled();
   });
 
   it("does not let an invalid CLI bearer token fall through to cookie auth", async () => {
@@ -220,5 +230,72 @@ describe("POST /api/usage/devices/resolve", () => {
         message: "Usage device candidate not found",
       },
     });
+  });
+});
+
+
+describe.each([
+  {
+    endpoint: "GET /api/usage/devices",
+    invoke: () => GET(cliRequest("http://localhost/api/usage/devices")),
+  },
+  {
+    endpoint: "POST /api/usage/devices/resolve",
+    invoke: () => POST(cliRequest("http://localhost/api/usage/devices/resolve", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ candidate_id: CANDIDATE_ID, decision: "merge" }),
+    })),
+  },
+])("$endpoint active CLI identity", ({ invoke }) => {
+  beforeEach(() => {
+    vi.mocked(verifyCliTokenWithRefresh).mockReturnValue({
+      userId: "cli-user",
+      username: "cli",
+      refreshedToken: "refreshed",
+    });
+    webSession("web-user");
+  });
+
+  it.each([
+    {
+      state: "deleted",
+      result: { data: { user: null }, error: { code: "user_not_found" } },
+    },
+    {
+      state: "banned",
+      result: {
+        data: { user: { id: "cli-user", banned_until: "2999-01-01T00:00:00Z" } },
+        error: null,
+      },
+    },
+  ])("rejects a signed token for a $state user before accessing device data", async ({ result }) => {
+    getUserById.mockResolvedValueOnce(result);
+
+    const response = await invoke();
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: { code: "unauthorized", message: "Unauthorized" } });
+    expect(getUserById).toHaveBeenCalledWith("cli-user");
+    expect(response.headers.has("X-Straude-Refreshed-Token")).toBe(false);
+    expect(createClient).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("returns 503 when the identity provider is unavailable", async () => {
+    getUserById.mockResolvedValueOnce({
+      data: { user: null },
+      error: { code: "request_timeout", message: "sensitive provider detail" },
+    });
+
+    const response = await invoke();
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({
+      error: { code: "identity_unavailable", message: "Identity verification unavailable" },
+    });
+    expect(response.headers.has("X-Straude-Refreshed-Token")).toBe(false);
+    expect(createClient).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
   });
 });

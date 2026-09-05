@@ -153,6 +153,19 @@ describe("POST /api/usage/submit (real Supabase)", () => {
     expect(Number(daily.rows[0].total_tokens)).toBe(160);
   });
 
+  it("preserves a user-edited generated title when usage is resynced", async () => {
+    const userId = await insertUser(db, { username: "v2_custom_title" });
+    const token = await mintCliToken(userId, "v2_custom_title");
+    await callSubmit(v2Body("title-before", "a".repeat(64)), token);
+    const generated = await db.query("SELECT usage_generated_title FROM public.posts WHERE user_id = $1", [userId]);
+    expect(generated.rows[0].usage_generated_title).toBe(true);
+    // PATCH /api/posts/[id] writes these fields together (covered by its API test).
+    await db.query("UPDATE public.posts SET title = $2, usage_generated_title = false WHERE user_id = $1", [userId, "Sep 4 — My launch notes"]);
+    await callSubmit(v2Body("title-after", "b".repeat(64)), token);
+    const post = await db.query("SELECT title, usage_generated_title FROM public.posts WHERE user_id = $1", [userId]);
+    expect(post.rows).toEqual([{ title: "Sep 4 — My launch notes", usage_generated_title: false }]);
+  });
+
   it("replays identical request/date/content as unchanged without duplicate rows", async () => {
     const userId = await insertUser(db, { username: "v2_replay" });
     const token = await mintCliToken(userId, "v2_replay");

@@ -1,3 +1,4 @@
+import { isActiveCliUser } from "@/lib/api/active-cli-user";
 import { verifyCliTokenWithRefresh } from "@/lib/api/cli-auth";
 import { createClient } from "@/lib/supabase/server";
 
@@ -13,13 +14,12 @@ export async function resolveUsageDevicesAuth(
   const authorization = request.headers.get("authorization");
   if (authorization) {
     const cli = verifyCliTokenWithRefresh(authorization);
-    return cli
-      ? {
-        userId: cli.userId,
-        source: "cli",
-        refreshedToken: cli.refreshedToken,
-      }
-      : null;
+    if (!cli || !(await isActiveCliUser(cli.userId))) return null;
+    return {
+      userId: cli.userId,
+      source: "cli",
+      refreshedToken: cli.refreshedToken,
+    };
   }
 
   try {

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { CliIdentityUnavailableError } from "@/lib/api/active-cli-user";
 import { getServiceClient } from "@/lib/supabase/service";
 import {
   resolveUsageDevicesAuth,
@@ -46,7 +47,18 @@ function parseCandidate(value: unknown): UsageDeviceCandidate | null {
 }
 
 export async function GET(request: Request): Promise<NextResponse> {
-  const auth = await resolveUsageDevicesAuth(request);
+  let auth;
+  try {
+    auth = await resolveUsageDevicesAuth(request);
+  } catch (error) {
+    if (error instanceof CliIdentityUnavailableError) {
+      return NextResponse.json(
+        { error: { code: "identity_unavailable", message: "Identity verification unavailable" } },
+        { status: 503 },
+      );
+    }
+    throw error;
+  }
   if (!auth) {
     return NextResponse.json(
       { error: { code: "unauthorized", message: "Unauthorized" } },

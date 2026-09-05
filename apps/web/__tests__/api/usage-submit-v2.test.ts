@@ -15,6 +15,11 @@ vi.mock("@/lib/api/cli-auth", () => ({
 const rpc = vi.fn();
 const from = vi.fn();
 
+vi.mock("@/lib/api/active-cli-user", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api/active-cli-user")>();
+  return { ...actual, isActiveCliUser: vi.fn().mockResolvedValue(true) };
+});
+
 vi.mock("@/lib/supabase/service", () => ({
   getServiceClient: vi.fn(() => ({ rpc, from })),
 }));
@@ -58,7 +63,7 @@ function requestBody() {
     protocol_version: 2,
     request_id: "request-v2",
     source: "cli",
-    timezone: "America/Vancouver",
+    timezone: "UTC",
     installation: { id: INSTALLATION_ID, name: "work-laptop" },
     collector: { name: "ccusage", version: "20.0.16", pricing_mode: "online" },
     entries: [{
@@ -141,7 +146,7 @@ describe("POST /api/usage/submit protocol v2", () => {
       p_user_id: "user-v2",
       p_request_id: "request-v2",
       p_source: "cli",
-      p_timezone: "America/Vancouver",
+      p_timezone: "UTC",
       p_installation: expect.objectContaining({ id: INSTALLATION_ID }),
       p_entry: expect.objectContaining({ date: DATE, agents: [agent()] }),
     }));
