@@ -1,5 +1,15 @@
 # Architecture & Design Decisions
 
+## Follow released ccusage source support through the unified collector (2026-09-04)
+
+**Decision:** Raise the bundled dependency and runtime floor to ccusage 20.0.20. Keep the existing source-agnostic daily report and metadata pipeline. Its released native binary exposes 16 coding-agent sources, including Gemini CLI, Qwen, and Grok Build CLI. Antigravity and ZCode appear on upstream main but are absent from this release; Mistral Vibe remains unsupported.
+
+**Alternatives considered:** (a) Add separate Gemini/gemistat, Qwen, and Mistral parsers as proposed in PRs #77 and #22. This could add an unsupported agent sooner, but duplicates parsing, deduplication, pricing, and maintenance. (b) Upgrade the unified collector and test its released source inventory. Chosen because Gemini and Qwen already work through this path, Grok needs only the dependency update, and the API already preserves dynamic source IDs. Mistral support should first land upstream.
+
+**Presentation:** Join-page text and share images use "AI coding" instead of inferring Claude Code or Codex from model names. Other agents can use the same models, so that inference mislabels their usage. Reading source metadata would allow specific labels but would add data queries to a copy fix; generic wording is accurate with the existing data.
+
+**Evidence and limits:** Native binary fixtures cover Gemini, Qwen, Grok, and a mixed day without Claude or Codex logs. They check cache buckets, reasoning totals, source metadata, and nonzero per-model prices. Grok's recorded USD ticks are checked exactly. The source inventory test compares all 16 documented IDs with installed binary help, and API tests check each ID independently. Tests run with an isolated child environment and synthetic logs. They do not prove every upstream parser or real provider billing. No database migration or extra collector is needed.
+
 ## Route sensitive mutations through the server service client (2026-08-27)
 
 **Decision:** Publishable Supabase roles retain only the reads and narrow self-service updates the browser needs. Security-sensitive writes go through authenticated API routes, which validate ownership and input before using the server service client. `SECURITY DEFINER` functions authorize their callers or restrict execution to the service role; public read RPCs expose explicit fields, enforce ownership joins, and bound batch and pagination work.
