@@ -6,30 +6,14 @@ STRICT
 SECURITY INVOKER
 SET search_path = ''
 AS $function$
-  SELECT (
-    substr(pg_catalog.md5('straude-web-import:' || p_user_id::TEXT), 1, 8)
-    || '-'
-    || substr(pg_catalog.md5('straude-web-import:' || p_user_id::TEXT), 9, 4)
-    || '-5'
-    || substr(pg_catalog.md5('straude-web-import:' || p_user_id::TEXT), 14, 3)
-    || '-8'
-    || substr(pg_catalog.md5('straude-web-import:' || p_user_id::TEXT), 18, 3)
-    || '-'
-    || substr(pg_catalog.md5('straude-web-import:' || p_user_id::TEXT), 21, 12)
-  )::UUID
+  -- Every usage and alias key includes user_id. Keep the old reserved UUID so
+  -- old and new servers write one web-import device during rolling deploys.
+  SELECT '00000000-0000-0000-0000-000000000001'::UUID
 $function$;
 
 REVOKE ALL ON FUNCTION public.usage_web_installation_id(UUID)
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.usage_web_installation_id(UUID) TO service_role;
-
--- The legacy browser import used one reserved device UUID for every account.
--- Normalize it before seeding the user-scoped installation alias table.
-UPDATE public.device_usage
-SET
-  device_id = public.usage_web_installation_id(user_id),
-  device_name = COALESCE(device_name, 'web-import')
-WHERE device_id = '00000000-0000-0000-0000-000000000001'::UUID;
 
 CREATE TABLE public.usage_installation_aliases (
   device_id UUID NOT NULL,
@@ -112,6 +96,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.usage_agent_daily TO servic
 
 -- Existing rows predate source partitioning. Keep their accounting under one
 -- explicit source until a trusted v2 snapshot atomically replaces it.
+-- Historical totals can exceed measured categories. The reasoning remainder
+-- below is unattributed legacy usage, not measured reasoning. Synthetic hashes
+-- identify backfill rows; they are not CLI SHA-256 hashes and force a rewrite.
 INSERT INTO public.usage_agent_daily (
   user_id,
   date,
@@ -486,25 +473,51 @@ BEGIN
   FOR UPDATE;
   v_action := CASE WHEN FOUND THEN 'updated' ELSE 'created' END;
 
+  -- Decide the whole date before writing any agent. A skipped component must
+  -- never be reported as committed or seal the CLI's contiguous watermark.
   FOR v_agent IN
-    SELECT value
-    FROM jsonb_array_elements(p_entry -> 'agents')
+    SELECT value FROM jsonb_array_elements(p_entry -> 'agents')
   LOOP
-    SELECT *
-    INTO v_existing_agent
-    FROM public.usage_agent_daily
-    WHERE user_id = p_user_id
-      AND date = v_date
-      AND device_id = v_canonical_device_id
-      AND agent = v_agent ->> 'agent'
-    FOR UPDATE;
+    IF v_agent ->> 'agent' = 'legacy-unpartitioned' AND EXISTS (
+      SELECT 1 FROM public.usage_agent_daily
+      WHERE user_id = p_user_id AND date = v_date
+        AND device_id = v_canonical_device_id AND agent <> 'legacy-unpartitioned'
+    ) THEN
+      RETURN jsonb_build_object(
+        'date', v_date, 'status', 'permanent_error',
+        'error', jsonb_build_object(
+          'code', 'usage_protocol_upgrade_required',
+          'message', 'This date already uses per-agent accounting. Update the CLI with npx straude@latest.'
+        )
+      );
+    END IF;
 
-    IF NOT FOUND
-      OR v_authoritative
-      OR (
-        v_legacy_authoritative
-        AND v_agent ->> 'agent' = 'legacy-unpartitioned'
-      )
+    IF v_agent ->> 'agent' = 'legacy-unpartitioned' THEN
+      -- The old server can write after the migration backfill. Compare its
+      -- current device total, so a stale legacy retry cannot erase those writes.
+      SELECT cost_usd, input_tokens, output_tokens, reasoning_output_tokens,
+        cache_creation_tokens, cache_read_tokens, total_tokens
+      INTO v_existing_agent.cost_usd, v_existing_agent.input_tokens,
+        v_existing_agent.output_tokens, v_existing_agent.reasoning_output_tokens,
+        v_existing_agent.cache_creation_tokens, v_existing_agent.cache_read_tokens,
+        v_existing_agent.total_tokens
+      FROM public.device_usage
+      WHERE user_id = p_user_id AND date = v_date AND device_id = v_canonical_device_id
+      FOR UPDATE;
+    ELSE
+      SELECT * INTO v_existing_agent FROM public.usage_agent_daily
+      WHERE user_id = p_user_id AND date = v_date
+        AND device_id = v_canonical_device_id AND agent = v_agent ->> 'agent'
+      FOR UPDATE;
+    END IF;
+
+    IF FOUND AND NOT (
+      v_authoritative
+      OR (v_legacy_authoritative AND v_agent ->> 'agent' = 'legacy-unpartitioned')
+      -- Trusted complete source snapshots may reprice or redistribute tokens.
+      -- Total tokens measures snapshot progress; prices and categories do not.
+      OR (v_trusted_partitioned_snapshot
+        AND (v_agent ->> 'total_tokens')::BIGINT >= v_existing_agent.total_tokens)
       OR (
         (v_agent ->> 'cost_usd')::NUMERIC >= v_existing_agent.cost_usd
         AND (v_agent ->> 'input_tokens')::BIGINT >= v_existing_agent.input_tokens
@@ -514,7 +527,20 @@ BEGIN
         AND (v_agent ->> 'cache_read_tokens')::BIGINT >= v_existing_agent.cache_read_tokens
         AND (v_agent ->> 'total_tokens')::BIGINT >= v_existing_agent.total_tokens
       )
-    THEN
+    ) THEN
+      RETURN jsonb_build_object(
+        'date', v_date, 'status', 'permanent_error',
+        'error', jsonb_build_object(
+          'code', 'usage_regression_rejected',
+          'message', 'The snapshot has less usage than stored. Restore complete local logs and retry this date.'
+        )
+      );
+    END IF;
+  END LOOP;
+
+  FOR v_agent IN
+    SELECT value FROM jsonb_array_elements(p_entry -> 'agents')
+  LOOP
       INSERT INTO public.usage_agent_daily (
         user_id,
         date,
@@ -567,7 +593,6 @@ BEGIN
           collector = EXCLUDED.collector,
           migration_id = EXCLUDED.migration_id,
           updated_at = pg_catalog.now();
-    END IF;
   END LOOP;
 
   IF v_trusted_partitioned_snapshot

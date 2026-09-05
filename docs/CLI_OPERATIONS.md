@@ -7,20 +7,24 @@ not authorize a production deploy by itself.
 ## Release order
 
 1. Apply `20260723133731_usage_submission_v2.sql` and
-   `20260723135641_usage_reconciliation.sql` to staging. Run
-   `bun run --cwd apps/web test:integration` against the migrated database and
-   retain the test output.
-2. Enable protocol-v2 routing for 5% of production users, then 25%, then 100%.
-   Hold each stage for at least 24 healthy hours. Rollback disables routing; do
-   not drop the additive tables or ledger.
-3. After the server accepts v2 at 100%, create the
+   `20260723135641_usage_reconciliation.sql` to an isolated staging database.
+   Run `bun run --cwd apps/web test:integration` and retain the output.
+2. Apply those same reviewed migrations to production before deploying this
+   server. Both v1 and v2 submissions use `submit_usage_day_v2`; deploying first
+   interrupts all syncs. The tables are additive, and existing server code
+   continues to use `device_usage` and `daily_usage`. Confirm function access
+   is restricted to `service_role`, then deploy the server and verify a v1 sync.
+   There is no percentage routing flag. Roll back the server deployment if
+   needed; keep the additive tables and ledger.
+3. After the server accepts v2 and remains healthy for 24 hours, create the
    `straude@0.2.0` tag. The release workflow publishes only the tarball already
    tested on Linux, macOS, and Windows with Node 20 and 22, then attaches that
    tarball and `SHA256SUMS` to the GitHub release.
 4. After 48 healthy hours, run historical repair in bounded batches. Verify a
    representative rollback before completing all batches.
-5. The default v1 cutoff is `2026-08-06`. Keep the compatibility path for one
-   further release, then remove it after observing no v1 traffic.
+5. V1 has no default cutoff. Set `STRAUDE_USAGE_V1_CUTOFF=YYYY-MM-DD` only after
+   publishing the compatible CLI and verifying adoption. Keep compatibility for
+   one further release, then remove it after observing no v1 traffic.
 
 ## Required alerts and dashboards
 
@@ -30,7 +34,7 @@ collector versions, pricing mode, status, retry count, and stage duration. They
 exclude tokens, costs, paths, hostnames, auth data, collector stderr, and raw
 usage.
 
-Configure these production alerts before moving beyond 5%:
+Configure these production alerts before production deployment:
 
 - Page on any invariant or transaction failure. Group by stable error code and
   release fingerprint so one defect creates one incident.

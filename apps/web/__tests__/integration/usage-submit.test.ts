@@ -280,8 +280,8 @@ describe("POST /api/usage/submit (real Supabase)", () => {
       [[firstUserId, secondUserId]],
     );
     expect(devices.rows).toHaveLength(2);
-    expect(new Set(devices.rows.map((row) => row.device_id)).size).toBe(2);
-    expect(devices.rows.every((row) => row.device_id !== sharedWebId)).toBe(true);
+    expect(new Set(devices.rows.map((row) => row.user_id)).size).toBe(2);
+    expect(devices.rows.every((row) => row.device_id === sharedWebId)).toBe(true);
   });
 
   it("repairs a proof-eligible historical duplicate and rolls the batch back exactly", async () => {
@@ -669,7 +669,7 @@ describe("POST /api/usage/submit (real Supabase)", () => {
     });
   });
 
-  it("allows trusted ccusage-by-agent-v2 corrections but ignores untrusted decreases", async () => {
+  it("allows trusted ccusage-by-agent-v2 corrections but reports rejected decreases", async () => {
     const userId = await insertUser(db, { username: "v2_correction" });
     const token = await mintCliToken(userId, "v2_correction");
     await callSubmit(v2Body("v2-high", "1".repeat(64), {
@@ -690,7 +690,11 @@ describe("POST /api/usage/submit (real Supabase)", () => {
       })],
     }), token);
 
-    await callSubmit(v2Body("v2-untrusted-low", "2".repeat(64)), token);
+    const rejected = await callSubmit(v2Body("v2-untrusted-low", "2".repeat(64)), token);
+    expect(rejected.status).toBe(400);
+    expect(await rejected.json()).toMatchObject({ outcomes: [{
+      status: "permanent_error", error: { code: "usage_regression_rejected" },
+    }] });
     let row = await db.query(
       "SELECT total_tokens, cost_usd FROM public.usage_agent_daily WHERE user_id = $1",
       [userId],
@@ -725,6 +729,73 @@ describe("POST /api/usage/submit (real Supabase)", () => {
     expect(Number(row.rows[0].total_tokens)).toBe(160);
     expect(Number(row.rows[0].cost_usd)).toBeCloseTo(0.25, 6);
     expect(row.rows[0].migration_id).toBe("ccusage-by-agent-v2");
+  });
+
+  it("reprices and redistributes a trusted snapshot without losing total-token progress", async () => {
+    const userId = await insertUser(db, { username: "v2_reprice" });
+    const token = await mintCliToken(userId, "v2_reprice");
+    await callSubmit(v2Body("reprice-before", "a".repeat(64)), token);
+    const next = v2Agent();
+    next.input_tokens += 10;
+    next.cache_read_tokens -= 10;
+    next.cost_usd = 0.2;
+    next.model_breakdown[0]!.input_tokens += 10;
+    next.model_breakdown[0]!.cache_read_tokens -= 10;
+    next.model_breakdown[0]!.cost_usd = 0.2;
+    const res = await callSubmit(v2Body("reprice-after", "b".repeat(64), { agents: [next] }), token);
+    expect(res.status).toBe(200);
+    const row = await db.query("SELECT total_tokens, input_tokens, cache_read_tokens, cost_usd FROM public.daily_usage WHERE user_id = $1", [userId]);
+    expect(Number(row.rows[0].total_tokens)).toBe(160);
+    expect(Number(row.rows[0].input_tokens)).toBe(110);
+    expect(Number(row.rows[0].cache_read_tokens)).toBe(20);
+    expect(Number(row.rows[0].cost_usd)).toBeCloseTo(0.2, 6);
+  });
+
+  it("rejects the whole date before writing any agent when one snapshot regresses", async () => {
+    const userId = await insertUser(db, { username: "v2_atomic_reject" });
+    const token = await mintCliToken(userId, "v2_atomic_reject");
+    await callSubmit(v2Body("atomic-before", "a".repeat(64)), token);
+    const smaller = v2Agent();
+    smaller.input_tokens -= 10;
+    smaller.total_tokens -= 10;
+    smaller.model_breakdown[0]!.input_tokens -= 10;
+    smaller.model_breakdown[0]!.total_tokens -= 10;
+    const res = await callSubmit(v2Body("atomic-after", "b".repeat(64), {
+      agents: [v2Agent({ agent: "claude" }), smaller],
+    }), token);
+    expect(res.status).toBe(400);
+    const row = await db.query("SELECT agent FROM public.usage_agent_daily WHERE user_id = $1", [userId]);
+    expect(row.rows).toEqual([{ agent: "codex" }]);
+    const outcomes = await db.query("SELECT request_id FROM public.usage_submission_outcomes WHERE user_id = $1", [userId]);
+    expect(outcomes.rows).toEqual([{ request_id: "atomic-before" }]);
+  });
+
+  it("does not double-count a legacy CLI resubmission after per-agent accounting", async () => {
+    const userId = await insertUser(db, { username: "v2_then_legacy" });
+    const token = await mintCliToken(userId, "v2_then_legacy");
+    await callSubmit(v2Body("partitioned", "a".repeat(64)), token);
+    const res = await callSubmit(v2Body("legacy-after", "b".repeat(64), {
+      agents: [v2Agent({ agent: "legacy-unpartitioned" })],
+    }), token);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ outcomes: [{
+      status: "permanent_error", error: { code: "usage_protocol_upgrade_required" },
+    }] });
+    const rows = await db.query("SELECT agent FROM public.usage_agent_daily WHERE user_id = $1", [userId]);
+    expect(rows.rows).toEqual([{ agent: "codex" }]);
+  });
+
+  it("protects old-server writes made after the migration backfill", async () => {
+    const userId = await insertUser(db, { username: "v1_deploy_bridge" });
+    const token = await mintCliToken(userId, "v1_deploy_bridge");
+    const legacy = { agents: [v2Agent({ agent: "legacy-unpartitioned" })] };
+    await callSubmit(v2Body("bridge-before", "a".repeat(64), legacy), token);
+    await db.query("UPDATE public.device_usage SET input_tokens = input_tokens + 100, total_tokens = total_tokens + 100, cost_usd = 1 WHERE user_id = $1", [userId]);
+    const res = await callSubmit(v2Body("bridge-stale", "b".repeat(64), legacy), token);
+    expect(res.status).toBe(400);
+    const row = await db.query("SELECT total_tokens, cost_usd FROM public.device_usage WHERE user_id = $1", [userId]);
+    expect(Number(row.rows[0].total_tokens)).toBe(260);
+    expect(Number(row.rows[0].cost_usd)).toBe(1);
   });
 
   it("atomically replaces legacy-unpartitioned accounting with a trusted v2 snapshot", async () => {

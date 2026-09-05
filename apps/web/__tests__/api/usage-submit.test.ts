@@ -98,6 +98,14 @@ beforeEach(() => {
 });
 
 describe("POST /api/usage/submit legacy adapter", () => {
+  it("keeps the published v1 CLI working when no sunset is configured", async () => {
+    vi.stubEnv("STRAUDE_USAGE_V1_CUTOFF", "");
+    const response = await POST(request(legacyBody()));
+    expect(response.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("submit_usage_day_v2", expect.anything());
+    vi.unstubAllEnvs();
+  });
+
   it("returns 426 with the exact update command after the configured v1 sunset", async () => {
     vi.stubEnv("STRAUDE_USAGE_V1_CUTOFF", "2000-01-01");
 

@@ -1,19 +1,8 @@
 ALTER TABLE public.posts
   ADD COLUMN usage_generated_title BOOLEAN NOT NULL DEFAULT false;
 
-UPDATE public.posts AS post
-SET usage_generated_title = true
-FROM public.daily_usage AS daily
-WHERE post.daily_usage_id = daily.id
-  AND (
-    post.title = pg_catalog.to_char(daily.date, 'Mon FMDD')
-      || CASE
-        WHEN daily.cost_usd > 0
-        THEN ', $' || pg_catalog.to_char(daily.cost_usd, 'FM999999990.00')
-        ELSE ''
-      END
-    OR post.title ~ '^[A-Z][a-z]{2} [0-9]{1,2}( — .+)?$'
-  );
+-- Existing titles have no reliable authorship marker. Preserve them, including
+-- date-prefixed user titles; only new generated posts opt into title updates.
 
 CREATE TABLE public.usage_device_reconciliation_candidates (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -285,8 +285,8 @@ describe("Migration safety", () => {
     expect(reconciliationMigration!.content).toMatch(
       /CREATE\s+OR\s+REPLACE\s+FUNCTION\s+public\.rollback_usage_repair_batch/i,
     );
-    expect(reconciliationMigration!.content).toMatch(
-      /\^\[A-Z\]\[a-z\]\{2\}\s+\[0-9\]\{1,2\}\(\s+—\s+\.\+\)\?\$/,
+    expect(reconciliationMigration!.content).not.toMatch(
+      /SET\s+usage_generated_title\s*=\s*true/i,
     );
     expect(reconciliationMigration!.content).toMatch(
       /canonical\.model_breakdown\s+IS\s+NOT\s+DISTINCT\s+FROM\s+duplicate\.model_breakdown/i,

@@ -30,7 +30,6 @@ const MAX_USAGE_ENTRIES = MAX_BACKFILL_DAYS + 2;
 const MAX_USAGE_BODY_BYTES = 256 * 1024;
 const USAGE_PROCESS_CONCURRENCY = 4;
 const COST_EPSILON_USD = 0.005;
-const DEFAULT_V1_CUTOFF = "2026-08-06";
 const RETRYABLE_DATABASE_CODES = new Set([
   "40001",
   "40P01",
@@ -89,7 +88,9 @@ function isV2Request(value: unknown): boolean {
 }
 
 function isLegacyProtocolSunset(): boolean {
-  const configured = process.env.STRAUDE_USAGE_V1_CUTOFF ?? DEFAULT_V1_CUTOFF;
+  // Retire v1 only after a compatible CLI is published and adoption is verified.
+  const configured = process.env.STRAUDE_USAGE_V1_CUTOFF;
+  if (!configured || !/^\d{4}-\d{2}-\d{2}$/.test(configured)) return false;
   const cutoff = Date.parse(`${configured}T00:00:00Z`);
   return Number.isFinite(cutoff) && Date.now() >= cutoff;
 }
