@@ -116,6 +116,19 @@ beforeEach(() => {
 });
 
 describe("POST /api/usage/submit protocol v2", () => {
+  it("returns an outcome for every date when a queued date expires", async () => {
+    const body = requestBody();
+    const expired = "2000-01-01";
+    body.entries.push({ ...body.entries[0]!, date: expired });
+    const response = await POST(request(body));
+    expect(response.status).toBe(207);
+    expect(await response.json()).toMatchObject({ outcomes: [
+      { date: DATE, status: "committed" },
+      { date: expired, status: "permanent_error", error: { code: "date_out_of_range" } },
+    ] });
+    expect(rpc.mock.calls.filter(([name]) => name === "submit_usage_day_v2")).toHaveLength(1);
+  });
+
   it("validates v2 before touching the database", async () => {
     const body = requestBody();
     body.entries[0]!.agents[0]!.cost_usd = 0.24;

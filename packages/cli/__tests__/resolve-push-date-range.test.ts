@@ -163,6 +163,15 @@ describe("resolvePushDateRange", () => {
       expect(isoDay(r.until)).toBe("2026-04-22");
     });
 
+    it("resumes an old installation at the oldest date the server accepts", () => {
+      const r = resolvePushDateRange({ today: dateAt("2026-05-04"), options: {},
+        lastPushDate: "2026-01-01", shouldRunMigrationBackfill: false });
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      expect(isoDay(r.since)).toBe("2026-04-04");
+      expect(isoDay(r.until)).toBe("2026-04-10");
+    });
+
     it("re-syncs only today when last_push_date >= today", () => {
       const r = resolvePushDateRange({
         today: dateAt("2026-05-04"),

@@ -654,22 +654,6 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
     usageRequest = adapted.request;
   }
-  const outOfWindow = usageRequest.entries.find(
-    (entry) => !isWithinBackfillWindow(entry.date, usageRequest.timezone),
-  );
-  if (outOfWindow) {
-    const message = `Date ${outOfWindow.date} is outside the ${MAX_BACKFILL_DAYS}-day backfill window`;
-    return v2
-      ? NextResponse.json({
-        request_id: usageRequest.request_id,
-        outcomes: [{
-          date: outOfWindow.date,
-          status: "permanent_error",
-          error: { code: "date_out_of_range", message },
-        }],
-      }, { status: 400 })
-      : NextResponse.json({ error: message }, { status: 400 });
-  }
 
   if (usageRequest.source !== auth.source) {
     const message = `Authenticated ${auth.source} requests cannot submit source ${usageRequest.source}`;
@@ -692,15 +676,16 @@ export async function POST(request: Request): Promise<NextResponse> {
   const outcomes = await mapWithConcurrency(
     usageRequest.entries,
     USAGE_PROCESS_CONCURRENCY,
-    (entry) => submitEntry(
-      db,
-      auth,
-      usageRequest,
-      entry,
-      appUrl,
-      cliVersion,
-      retryAttempt,
-    ),
+    (entry) => isWithinBackfillWindow(entry.date, usageRequest.timezone)
+      ? submitEntry(db, auth, usageRequest, entry, appUrl, cliVersion, retryAttempt)
+      : Promise.resolve<UsageOutcomeV2>({
+        date: entry.date,
+        status: "permanent_error",
+        error: {
+          code: "date_out_of_range",
+          message: `Date ${entry.date} is outside the ${MAX_BACKFILL_DAYS}-day backfill window`,
+        },
+      }),
   );
   const status = statusForOutcomes(outcomes, v2);
   const headers = responseHeaders(auth);

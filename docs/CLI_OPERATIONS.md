@@ -26,6 +26,20 @@ not authorize a production deploy by itself.
    publishing the compatible CLI and verifying adoption. Keep compatibility for
    one further release, then remove it after observing no v1 traffic.
 
+## Snapshot recovery
+
+Trusted online ccusage snapshots can update prices and token categories while
+preserving or increasing each source's total tokens. A smaller source snapshot
+rejects the entire date with `usage_regression_rejected`; the CLI prints the date
+and instructions, retains its previous watermark, and recollects on the next run.
+Restore complete local logs before retrying. Retries never report skipped data
+as committed. Unpartitioned legacy submissions cannot add a second copy after a
+date has switched to per-agent accounting.
+
+Automatic catch-up begins at the oldest date the server accepts after a long
+absence, with an explicit notice about expired dates. Each submitted date gets
+its own outcome, including expired outbox dates, so valid work can settle.
+
 ## Required alerts and dashboards
 
 The submit route emits one redacted `usage_submit_request` event per request and

@@ -199,7 +199,9 @@ export function resolvePushDateRange(args: {
     return { ok: true, since: date, until: date, mode: "incremental" };
   }
 
-  const since = addCalendarDays(args.lastPushDate, 1);
+  const nextUncommitted = addCalendarDays(args.lastPushDate, 1);
+  const oldestAccepted = addCalendarDays(today, -MAX_BACKFILL_DAYS);
+  const since = nextUncommitted < oldestAccepted ? oldestAccepted : nextUncommitted;
   const until = calendarDaysBetween(since, today) >= DEFAULT_SYNC_DAYS
     ? addCalendarDays(since, DEFAULT_SYNC_DAYS - 1)
     : today;
@@ -696,6 +698,10 @@ export async function pushCommand(
 
   const since = localDateToCalendarDate(resolution.since);
   const until = localDateToCalendarDate(resolution.until);
+  if (resolution.mode === "incremental" && config.last_push_date
+    && addCalendarDays(config.last_push_date, 1) < since) {
+    console.error(`Usage before ${since} is outside the server's ${MAX_BACKFILL_DAYS}-day window. Syncing the available dates.`);
+  }
   let requestedDates = listCalendarDates(since, until);
   const automaticWatermarkDate = (
     resolution.mode === "incremental"

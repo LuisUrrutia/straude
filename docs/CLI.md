@@ -250,7 +250,8 @@ The CLI sends operational events to Straude's PostHog project: command and CLI
 version, success/failure outcome, stage timings, collector version and detected
 source IDs, and aggregate counts such as days, tokens, and cost. It does not send
 prompts, code, conversation content, or raw ccusage rows. Before transmission,
-the configured home-directory prefix is replaced with `~` in free-form values.
+error diagnostics use fixed categories, status codes, and a grouping fingerprint.
+Original error messages, local stack paths, and collector stderr stay on the device.
 
 Disable telemetry with either environment variable:
 
