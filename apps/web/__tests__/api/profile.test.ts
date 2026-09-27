@@ -539,45 +539,6 @@ describe("PATCH /api/users/me", () => {
     expect(res.status).toBe(400);
   });
 
-  it("validates bio length (max 160)", async () => {
-    const client: Record<string, any> = {
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: "u-1" } },
-          error: null,
-        }),
-      },
-      from: vi.fn(),
-    };
-    (createClient as any).mockResolvedValue(client);
-
-    const res = await PATCH(
-      makeRequest("PATCH", "/api/users/me", { bio: "x".repeat(161) })
-    );
-    const json = await res.json();
-
-    expect(res.status).toBe(400);
-    expect(json.error).toContain("160 characters");
-  });
-
-  it("rejects oversized profile identity fields", async () => {
-    const client: Record<string, any> = {
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: "u-1" } },
-          error: null,
-        }),
-      },
-    };
-    (createClient as any).mockResolvedValue(client);
-
-    const res = await PATCH(
-      makeRequest("PATCH", "/api/users/me", { display_name: "x".repeat(101) })
-    );
-
-    expect(res.status).toBe(400);
-  });
-
   it("rejects avatar URLs outside approved providers", async () => {
     const client: Record<string, any> = {
       auth: {
@@ -636,7 +597,37 @@ describe("PATCH /api/users/me", () => {
     });
   });
 
-  it("validates how you heard about Straude length (max 500)", async () => {
+  it("stores acquisition sources in catalog order", async () => {
+    const { updateMock } = mockAuthenticatedProfileUpdate();
+
+    const res = await PATCH(
+      makeRequest("PATCH", "/api/users/me", {
+        heard_about_sources: ["github", "google", "github"],
+      })
+    );
+
+    expect(res.status).toBe(200);
+    expect(updateMock).toHaveBeenCalledWith({ heard_about_sources: ["google", "github"] });
+  });
+
+  it("stores the search-engine choice with its optional detail", async () => {
+    const { updateMock } = mockAuthenticatedProfileUpdate();
+
+    const res = await PATCH(
+      makeRequest("PATCH", "/api/users/me", {
+        heard_about_sources: ["search_engine"],
+        heard_about: "  AI coding usage tracker  ",
+      })
+    );
+
+    expect(res.status).toBe(200);
+    expect(updateMock).toHaveBeenCalledWith({
+      heard_about_sources: ["search_engine"],
+      heard_about: "AI coding usage tracker",
+    });
+  });
+
+  it("rejects unknown acquisition sources instead of storing them", async () => {
     const client: Record<string, any> = {
       auth: {
         getUser: vi.fn().mockResolvedValue({
@@ -648,13 +639,31 @@ describe("PATCH /api/users/me", () => {
     };
     (createClient as any).mockResolvedValue(client);
 
-    const res = await PATCH(
-      makeRequest("PATCH", "/api/users/me", { heard_about: "x".repeat(501) })
-    );
-    const json = await res.json();
+    for (const heard_about_sources of [
+      ["myspace"],
+      [],
+      "google",
+      { source: "google" },
+    ]) {
+      const res = await PATCH(
+        makeRequest("PATCH", "/api/users/me", { heard_about_sources })
+      );
+      const json = await res.json();
 
-    expect(res.status).toBe(400);
-    expect(json.error).toContain("500 characters");
+      expect(res.status).toBe(400);
+      expect(json.error).toContain("heard_about_sources");
+    }
+  });
+
+  it("clears acquisition sources with null", async () => {
+    const { updateMock } = mockAuthenticatedProfileUpdate();
+
+    const res = await PATCH(
+      makeRequest("PATCH", "/api/users/me", { heard_about_sources: null })
+    );
+
+    expect(res.status).toBe(200);
+    expect(updateMock).toHaveBeenCalledWith({ heard_about_sources: null });
   });
 
   it("accepts valid http and https profile links", async () => {
@@ -804,24 +813,4 @@ describe("PATCH /api/users/me", () => {
     expect(json.error).toBe("Unauthorized");
   });
 
-  it("rejects empty update", async () => {
-    const client: Record<string, any> = {
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: "u-1" } },
-          error: null,
-        }),
-      },
-      from: vi.fn(),
-    };
-    (createClient as any).mockResolvedValue(client);
-
-    const res = await PATCH(
-      makeRequest("PATCH", "/api/users/me", { nonexistent_field: "value" })
-    );
-    const json = await res.json();
-
-    expect(res.status).toBe(400);
-    expect(json.error).toBe("No fields to update");
-  });
 });

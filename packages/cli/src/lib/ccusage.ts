@@ -16,6 +16,15 @@ const PRICING_RECOVERY_BUDGET_MS = 60_000;
 const PRICING_RETRY_DELAYS_MS = [1_000, 3_000] as const;
 const MISSING_PRICING_RE = /(missing|unavailable|unknown|could not fetch|failed to fetch).{0,80}(pricing|price|cost)|pricing.{0,80}(missing|unavailable|unknown)|cost excludes/i;
 const EMBEDDED_PRICING_FALLBACK_RE = /failed to (?:fetch|parse) litellm pricing.*using embedded pricing/i;
+// Models from an agent's own vendor must carry a live price: a zero cost means
+// LiteLLM has not caught up yet, so the push fails closed and retries later.
+// Third-party models routed through the same agent (Codex with a Kimi or
+// Fireworks provider, Claude Code against GLM) may never get a catalogue
+// price, so their usage is left out of the push instead of blocking every date.
+const FIRST_PARTY_MODELS: Record<string, RegExp> = {
+  claude: /(?:^|\/)claude-/,
+  codex: /(?:^|\/)(?:gpt-|o\d|codex-)/,
+};
 
 export type CcusageAgent = string;
 
@@ -414,12 +423,9 @@ function parseModelBreakdown(value: unknown, date: string): ModelBreakdownEntry[
     if (typeof model !== "string" || model.length === 0) {
       throw new Error(`Invalid ccusage row for ${date}: modelBreakdowns[${index}].modelName is required.`);
     }
+    // ccusage marks catalogue misses with missingPricing and cost 0; the
+    // agent-level check decides whether that zero cost is acceptable.
     const cost = asFiniteNumber(raw.cost ?? raw.cost_usd, `modelBreakdowns[${index}].cost`, date);
-    if (raw.missingPricing === true) {
-      throw new PricingUnavailableError(
-        `ccusage did not produce live pricing for ${model} on ${date}.`,
-      );
-    }
     const inputTokens = asFiniteNumber(
       raw.inputTokens ?? 0,
       `modelBreakdowns[${index}].inputTokens`,
@@ -480,6 +486,62 @@ function parseModelBreakdown(value: unknown, date: string): ModelBreakdownEntry[
     throw new Error(`Invalid ccusage row for ${date}: modelBreakdowns contains duplicate models.`);
   }
   return breakdown.length > 0 ? breakdown : undefined;
+}
+
+function isUnpriced(model: ModelBreakdownEntry): boolean {
+  return model.totalTokens > 0 && model.cost_usd === 0;
+}
+
+type TokenUsage = Pick<
+  ModelBreakdownEntry,
+  "inputTokens" | "outputTokens" | "reasoningOutputTokens" | "cacheCreationTokens" | "cacheReadTokens" | "totalTokens"
+>;
+
+function usageWithout(usage: TokenUsage, removed: ModelBreakdownEntry[]): TokenUsage {
+  const sum = (field: keyof TokenUsage) => removed.reduce((total, model) => total + model[field], 0);
+  return {
+    inputTokens: usage.inputTokens - sum("inputTokens"),
+    outputTokens: usage.outputTokens - sum("outputTokens"),
+    reasoningOutputTokens: usage.reasoningOutputTokens - sum("reasoningOutputTokens"),
+    cacheCreationTokens: usage.cacheCreationTokens - sum("cacheCreationTokens"),
+    cacheReadTokens: usage.cacheReadTokens - sum("cacheReadTokens"),
+    totalTokens: usage.totalTokens - sum("totalTokens"),
+  };
+}
+
+/**
+ * Leaves out models ccusage could not price. Unpriced first-party models have
+ * already failed closed, so what remains here is third-party usage. Returns
+ * null when nothing priced is left for the day.
+ */
+function withoutUnpricedModels(entry: CcusageDailyEntry): CcusageDailyEntry | null {
+  const unpriced = entry.agentBreakdown.flatMap((agent) => agent.modelBreakdown.filter(isUnpriced));
+  if (unpriced.length === 0) return entry;
+
+  const dropped = new Set(unpriced.map((model) => model.model));
+  const agentBreakdown = entry.agentBreakdown.flatMap((agent): CcusageAgentEntry[] => {
+    const removed = agent.modelBreakdown.filter(isUnpriced);
+    if (removed.length === 0) return [agent];
+    const modelBreakdown = agent.modelBreakdown.filter((model) => !isUnpriced(model));
+    if (modelBreakdown.length === 0) return [];
+    return [{
+      ...agent,
+      ...usageWithout(agent, removed),
+      models: agent.models.filter((model) => !dropped.has(model)),
+      modelBreakdown,
+    }];
+  });
+  if (agentBreakdown.length === 0) return null;
+
+  const modelBreakdown = entry.modelBreakdown?.filter((model) => !dropped.has(model.model));
+  return {
+    ...entry,
+    ...usageWithout({ ...entry, reasoningOutputTokens: entry.reasoningOutputTokens ?? 0 }, unpriced),
+    agents: agentBreakdown.map((agent) => agent.agent),
+    agentBreakdown,
+    models: entry.models.filter((model) => !dropped.has(model)),
+    modelBreakdown: modelBreakdown && modelBreakdown.length > 0 ? modelBreakdown : undefined,
+  };
 }
 
 function assertTokenTotal(
@@ -593,13 +655,8 @@ function parseAgentBreakdown(value: unknown, date: string): CcusageAgentEntry[] 
     const totalTokens = asFiniteNumber(raw.totalTokens, `agents[${index}].totalTokens`, date);
     const costUSD = asFiniteNumber(raw.totalCost, `agents[${index}].totalCost`, date);
     const parsedModelBreakdown = parseModelBreakdown(raw.modelBreakdowns, date) ?? [];
-    const tokensRequirePaidPricing = raw.agent === "claude" || raw.agent === "codex";
-    if (tokensRequirePaidPricing && totalTokens > 0 && costUSD === 0) {
-      throw new PricingUnavailableError(
-        `ccusage did not provide pricing for ${raw.agent} usage on ${date}.`,
-      );
-    }
-    if (tokensRequirePaidPricing && totalTokens > 0 && parsedModelBreakdown.length === 0) {
+    const firstPartyModel = FIRST_PARTY_MODELS[raw.agent];
+    if (firstPartyModel && totalTokens > 0 && parsedModelBreakdown.length === 0) {
       throw new PricingUnavailableError(
         `ccusage did not provide model pricing for ${raw.agent} usage on ${date}.`,
       );
@@ -620,7 +677,7 @@ function parseAgentBreakdown(value: unknown, date: string): CcusageAgentEntry[] 
       reasoningOutputTokens,
     );
     for (const model of modelBreakdown) {
-      if (tokensRequirePaidPricing && model.totalTokens > 0 && model.cost_usd === 0) {
+      if (isUnpriced(model) && firstPartyModel?.test(model.model)) {
         throw new PricingUnavailableError(
           `ccusage did not provide pricing for ${raw.agent} model ${model.model} on ${date}.`,
         );
@@ -702,7 +759,6 @@ export function parseCcusageOutput(raw: string, options: ParseOptions = {}): Ccu
   }
 
   const rawRows = normalizeRawDaily(parsed);
-  const seenAgents = new Set<CcusageAgent>();
   const data = rawRows.flatMap((row, index) => {
     if (!isRecord(row)) {
       throw new Error(`Invalid ccusage row at index ${index}: expected an object.`);
@@ -714,7 +770,6 @@ export function parseCcusageOutput(raw: string, options: ParseOptions = {}): Ccu
     }
 
     const rowAgents = parseAgents(row, date);
-    rowAgents.forEach((agent) => seenAgents.add(agent));
     const agentBreakdown = parseAgentBreakdown(row.agents, date);
     const breakdownNames = agentBreakdown.map((agent) => agent.agent);
     if (
@@ -776,7 +831,7 @@ export function parseCcusageOutput(raw: string, options: ParseOptions = {}): Ccu
 
     const modelNames = new Set<string>(models);
     for (const breakdown of modelBreakdown ?? []) modelNames.add(breakdown.model);
-    return [{
+    const entry = withoutUnpricedModels({
       date,
       agents: rowAgents,
       agentBreakdown,
@@ -789,7 +844,8 @@ export function parseCcusageOutput(raw: string, options: ParseOptions = {}): Ccu
       costUSD,
       reasoningOutputTokens,
       modelBreakdown,
-    }];
+    });
+    return entry ? [entry] : [];
   });
 
   data.sort((a, b) => a.date.localeCompare(b.date));
@@ -799,7 +855,7 @@ export function parseCcusageOutput(raw: string, options: ParseOptions = {}): Ccu
     }
   }
 
-  const agents = [...seenAgents].sort();
+  const agents = [...new Set(data.flatMap((entry) => entry.agents))].sort();
   const version = options.version ?? "unknown";
   const pricingMode = options.pricingMode ?? CCUSAGE_DEFAULT_PRICING_MODE;
 

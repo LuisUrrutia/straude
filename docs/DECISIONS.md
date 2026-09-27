@@ -1,14 +1,34 @@
 # Architecture & Design Decisions
 
-## Use jsdom compatible with Lambda's module restrictions (2026-09-07)
+## Use jsdom compatible with Lambda's module restrictions (2026-09-26)
 
 **Decision:** Pin jsdom to 26.1.0 so profile routes load when the runtime disables experimental `require(ESM)`. Keep DOMPurify, the existing SVG safety checks and direct SVG/PNG discovery with Google fallback.
 
-**Evidence:** Production returned HTTP 500 HTML for both unauthenticated GET and PATCH requests to `/api/users/me`, while `/api/notifications` returned the expected 401 JSON. The same commit built and ran successfully locally under normal Node settings. Disabling `require(ESM)` reproduced a route-loading `ERR_REQUIRE_ESM` from jsdom 28.1.0's `html-encoding-sniffer` dependency importing `@exodus/bytes`. Production runtime logs were unavailable, so matching that exception to this deployment remains unverified. AWS documents the disabled feature at https://docs.aws.amazon.com/lambda/latest/dg/lambda-nodejs.html#nodejs-experimental-features.
+**Evidence:** Production returned HTTP 500 HTML for both unauthenticated GET and PATCH requests to `/api/users/me`, while `/api/notifications` returned the expected 401 JSON. The same commit built and ran successfully locally under normal Node settings. Disabling `require(ESM)` reproduced a route-loading `ERR_REQUIRE_ESM` from jsdom 28.1.0's `html-encoding-sniffer` dependency importing `@exodus/bytes`. Production runtime logs confirmed the same exception on deployment `dpl_BdNAh58wzR69EjZLSiZVfsuuKwoV`. AWS documents the disabled feature at https://docs.aws.amazon.com/lambda/latest/dg/lambda-nodejs.html#nodejs-experimental-features.
 
-**Alternatives:** Bundling jsdom through `transpilePackages` failed during page-data collection because Turbopack rewrote its default stylesheet path to `/ROOT/...`. jsdom 27.0.0 also failed with the feature disabled through its CSS dependencies. Pinning 26.1.0 avoids a custom bundling pipeline or requiring an experimental runtime feature. The pin trades newer DOM features for runtime compatibility.
+**Alternatives:** Bundling jsdom through `transpilePackages` failed during page-data collection because Turbopack rewrote its default stylesheet path to `/ROOT/...`. jsdom 27.0.0 also failed with the feature disabled through its CSS dependencies. Pinning 26.1.0 avoids a custom bundling pipeline or requiring an experimental runtime feature. The pin trades newer DOM features for runtime compatibility. Deferring the import would restore unauthenticated responses but leave favicon updates broken, so it does not fix the complete route.
 
-**Verification:** Run `NODE_OPTIONS=--no-experimental-require-module CI=1 bun run --cwd apps/web test:e2e e2e/team-favicon-save.spec.ts e2e/landing.spec.ts --reporter=list` against a local Supabase build to verify HTTP authentication, settings persistence, cached SVG/PNG display and the landing smoke path under the same restriction. The favicon integration suite separately verifies discovery, sanitization and Storage with real local Supabase.
+**Verification:** Run `NODE_OPTIONS=--no-experimental-require-module CI=1 bun run --cwd apps/web test:e2e e2e/team-favicon-save.spec.ts e2e/landing.spec.ts --reporter=list` against a local Supabase build to verify HTTP authentication, settings persistence, cached SVG/PNG display and the landing smoke path under the same restriction. CI now runs browser tests with the same module restriction. The signup journey uses a real email link, CLI device authorization and protocol-v2 usage submission, then verifies the acquisition source and optional detail in the database after reload. Local browser coverage passed all seven onboarding/profile/favicon checks. Production also lacked the existing `heard_about_sources` migration; apply it before hosted verification.
+
+## Catch bugs with E2E tests; keep unit tests only for gaps E2E cannot reach (2026-09-24)
+
+**Decision:** E2E tests are the default testing mechanism: Playwright in `apps/web/e2e`, and the built CLI binary in `packages/cli/__tests__/e2e` and `packages/cli/scripts/packaged-cli-e2e.mjs`. Agents must not write unit tests after writing code, and must not add tautological tests (asserting what a mock was told to return) or change-detector tests (pinning copy, markup, class names, call counts or internal structure). A bug fix gets a new test only when no E2E test can cover the behavior.
+
+**Why:** Most of the deleted unit tests mocked Supabase and then asserted the mocked rows came back, or pinned rendered copy and component structure. Those tests failed on harmless refactors and passed through real regressions, so they cost review and maintenance time without catching bugs. E2E tests run the real browser, server, database and packaged binary, so a green run says the product works.
+
+**What stays:** Unit tests for failure modes E2E cannot reach cheaply: pricing and cost math, fail-closed pricing, usage submit validation and idempotency, auth and ownership checks, SSRF and URL validation, rate limits, date and timezone edges, streaks and ranking, and CLI parsing, sync state and scheduler handling. Integration tests against real Supabase and real ccusage are unchanged.
+
+**Alternatives considered:** (a) Keep the suite and only stop adding new low-signal tests. Rejected because the existing tests keep teaching agents the pattern and keep breaking on refactors. (b) Delete all unit tests. Rejected because the kept tests cover security and money paths that E2E would need many slow, fragile fixtures to reach. (c) Replace mocks with an in-memory Supabase fake. Rejected because it adds a second database implementation to maintain, and the integration suite already runs against the real one.
+
+## Skip unpriced third-party models; fail closed on first-party ones (2026-09-22)
+
+**Decision:** Narrow the 2026-07-23 pricing rule from "any Claude or Codex model" to "the agent's own vendor models": `claude-*` in Claude Code, and `gpt-*`, `o<digit>*` or `codex-*` in Codex. When one of those has tokens and zero cost, the push still fails with `PricingUnavailableError` and retries later. Any other model with tokens and zero cost, whether or not ccusage flags it with `missingPricing`, is left out of the push without a message: its tokens come off the agent and daily totals, and a day or agent with nothing else left is dropped. The first-party table lives in `FIRST_PARTY_MODELS` in `packages/cli/src/lib/ccusage.ts`.
+
+**Why:** Codex and Claude Code can call third-party providers, so the agent does not tell us the model vendor. ccusage 20.0.24 marked Codex's `kimi-fast-latest` as `missingPricing`. That one model on one day blocked six days and about $1,335 of priced usage on every run. LiteLLM will likely never price such aliases, so retries cannot help. A first-party gap is different: it usually means a new model that LiteLLM prices within days, so failing closed keeps a $0 row out of cumulative spend.
+
+**Alternatives considered:** (a) Keep failing closed for every Claude/Codex model. Rejected because it blocks all pushes until the user stops using that provider. (b) Never fail on per-model gaps and rely on the stderr fetch-failure check. Rejected because a new GPT or Claude model would then store $0 rows, and sync state would move past those dates. (c) Log unpriced models at $0 with a stderr notice. Rejected because it stores token counts with a cost we know is wrong and prints noise on every push for a model the user cannot fix.
+
+**Limits:** The prefixes are a heuristic. A vendor model under a new prefix is skipped, not blocked, so its spend is lost until the prefix is added. A genuinely free model is also skipped, which only drops tokens, never spend. An open-weight model under a vendor prefix (for example `gpt-oss-*` on a local server) fails closed if LiteLLM has no price for that exact name.
 
 ## Discover and cache team favicons directly (2026-09-05)
 
@@ -115,7 +135,7 @@
 
 ## Accept stable ccusage releases above the accuracy floor and fail closed on paid-model pricing (2026-07-23)
 
-**Decision:** Publish `ccusage: >=20.0.20`, accept any stable semantic version at or above that floor, and record the version actually installed. Agent and model IDs remain opaque strings. Any Claude or Codex model breakdown with nonzero tokens and zero cost is rejected with `PricingUnavailableError`; other sources may legitimately report zero-cost usage.
+**Decision:** Publish `ccusage: >=20.0.20`, accept any stable semantic version at or above that floor, and record the version actually installed. Agent and model IDs remain opaque strings. Any Claude or Codex model breakdown with nonzero tokens and zero cost is rejected with `PricingUnavailableError`; other sources may legitimately report zero-cost usage. *(Changed on 2026-09-22: only first-party models fail closed, and other zero-cost models are skipped; see "Skip unpriced third-party models; fail closed on first-party ones".)*
 
 **Why:** ccusage owns source adapters and pricing support, so a patch or major ceiling delays new models and sources until Straude republishes. The open-ended floor lets fresh installs pick up a newer stable collector when its output still passes Straude's strict parser, accounting, and pricing invariants. Existing installs do not mutate in place; they receive the newer collector only after reinstalling or upgrading Straude.
 
@@ -1052,3 +1072,26 @@ Pricing the new-logic numbers at gpt-5.5 rates: $228.68 — matches what OpenAI 
 3. **Reimplement GPT-5.6 prices in Straude** — rejected because duplicate model tables create another source of drift and lose ccusage's request-level long-context handling.
 
 **Why this option:** ccusage is already the authoritative local parser and pricing adapter. Straude should validate its output shape, preserve source provenance, and test the resulting totals, not maintain a parallel catalog. A real Codex JSONL fixture exercises the installed native ccusage binary against all four GPT-5.6 variants and locks both token buckets and the LiteLLM-priced total.
+
+## Acquisition Sources Are a Separate Array Column (2026-09-20)
+
+**Decision:** Store the onboarding survey answer as `users.heard_about_sources TEXT[]` and keep `heard_about` as the optional free-text detail behind the "Other" option. Reuse the existing `HEARD_ABOUT_OPTION_KEYS` catalog values as the stored keys, and validate them in `PATCH /api/users/me`.
+
+**Alternatives considered:**
+
+1. **Encode the selection inside the existing `heard_about` text column** — rejected because it mixes a closed set with free text in one field. Every count would need parsing, and "Other" could not be stored without a second convention inside the same string.
+2. **One boolean column per option** — rejected because the option list changes, and each change would need a migration plus a code change in three places.
+3. **A join table (`user_heard_about`)** — rejected as more machinery than the data needs. There is no per-row attribute to store, and Postgres arrays aggregate with `unnest` when analysis needs counts.
+
+**Why arrays plus a catalog:** the keys are stable machine values, so labels can change without a data migration, and analytics can group by key. Unknown keys are rejected rather than coerced, so a stale client cannot write a value the catalog does not describe.
+
+## The Survey Closes Onboarding Instead of Gating It (2026-09-20)
+
+**Decision:** Show the survey as the final step of the existing `/onboarding` page, after the first sync succeeds. Keep the `onboarding_completed` save where it is, so it still fires as soon as usage arrives.
+
+**Alternatives considered:**
+
+1. **A separate `/onboarding/heard-about` route after the sync step** — rejected because `onboarding_completed` would have to move to the last step. That delays the welcome email, and it would skip the server-side `activation_completed` event for anyone who syncs and then abandons the survey, corrupting the activation funnel this project measures.
+2. **A blocking step before the sync command** — rejected because it puts a survey in front of the activation action, which the first-sync conversion work set out to shorten.
+
+**Why the inline step:** onboarding still completes on confirmed usage, so no funnel event changes meaning. The survey is the last thing a new user sees before entering the app, and Skip leaves the database untouched.

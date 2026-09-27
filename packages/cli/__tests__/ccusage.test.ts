@@ -278,16 +278,103 @@ describe("parseCcusageOutput", () => {
     ]))).toThrow(/cost differs from its model breakdown/);
   });
 
-  it("rejects explicit missing pricing markers", () => {
-    expect(() => parseCcusageOutput(rawOutput([
-      row({
-        modelBreakdowns: [{
-          modelName: "gpt-5.2-codex",
-          cost: 0,
-          missingPricing: true,
-        }],
-      }),
-    ]))).toThrow(/did not produce live pricing/);
+  function missingPricingRow(agent: string, model: string) {
+    // Shape emitted by ccusage 20.0.24 for a model absent from LiteLLM.
+    const breakdown = {
+      modelName: model,
+      inputTokens: 68922,
+      outputTokens: 12860,
+      cacheCreationTokens: 0,
+      cacheReadTokens: 1621876,
+      cost: 0,
+      missingPricing: true,
+    };
+    return row({
+      period: "2026-09-17",
+      modelsUsed: [model],
+      inputTokens: 68922,
+      outputTokens: 12860,
+      cacheCreationTokens: 0,
+      cacheReadTokens: 1621876,
+      totalTokens: 1703658,
+      totalCost: 0,
+      modelBreakdowns: [breakdown],
+      metadata: { agents: [agent] },
+      agents: [{
+        agent,
+        modelsUsed: [model],
+        inputTokens: 68922,
+        outputTokens: 12860,
+        cacheCreationTokens: 0,
+        cacheReadTokens: 1621876,
+        totalTokens: 1703658,
+        totalCost: 0,
+        modelBreakdowns: [breakdown],
+      }],
+    });
+  }
+
+  it.each([
+    ["codex", "kimi-fast-latest"],
+    ["codex", "accounts/fireworks/models/deepseek-v4p1-flash"],
+    ["claude", "glm-latest"],
+  ])("leaves out a third-party %s model without a catalogue price (%s)", (agent, model) => {
+    const parsed = parseCcusageOutput(rawOutput([missingPricingRow(agent, model), row()]));
+
+    expect(parsed.data.map((entry) => entry.date)).toEqual(["2026-05-13"]);
+    expect(parsed.agents).toEqual(["codex"]);
+  });
+
+  it("keeps priced models when an unpriced one shares the same day and agent", () => {
+    const priced = (row().modelBreakdowns as Array<Record<string, unknown>>)[0]!;
+    const unpriced = {
+      modelName: "kimi-fast-latest",
+      inputTokens: 100,
+      outputTokens: 10,
+      cacheCreationTokens: 0,
+      cacheReadTokens: 1000,
+      cost: 0,
+      missingPricing: true,
+    };
+    const totals = {
+      modelsUsed: ["gpt-5.2-codex", "kimi-fast-latest"],
+      inputTokens: 850,
+      outputTokens: 135,
+      cacheCreationTokens: 0,
+      cacheReadTokens: 1250,
+      totalTokens: 2235,
+      totalCost: 0.00310625,
+      modelBreakdowns: [priced, unpriced],
+    };
+    const parsed = parseCcusageOutput(rawOutput([
+      row({ ...totals, agents: [{ agent: "codex", ...totals }] }),
+    ]));
+
+    const entry = parsed.data[0]!;
+    expect(entry).toMatchObject({
+      models: ["gpt-5.2-codex"],
+      inputTokens: 750,
+      outputTokens: 125,
+      cacheReadTokens: 250,
+      totalTokens: 1125,
+      costUSD: 0.00310625,
+    });
+    expect(entry.modelBreakdown!.map((model) => model.model)).toEqual(["gpt-5.2-codex"]);
+    expect(entry.agentBreakdown[0]).toMatchObject({
+      models: ["gpt-5.2-codex"],
+      inputTokens: 750,
+      totalTokens: 1125,
+    });
+    expect(entry.agentBreakdown[0]!.modelBreakdown.map((model) => model.model)).toEqual(["gpt-5.2-codex"]);
+  });
+
+  it.each([
+    ["codex", "gpt-7"],
+    ["codex", "openai/o5-mini"],
+    ["claude", "claude-fable-6"],
+  ])("fails closed when %s marks its own model %s as missing pricing", (agent, model) => {
+    expect(() => parseCcusageOutput(rawOutput([missingPricingRow(agent, model)])))
+      .toThrow(PricingUnavailableError);
   });
 
   it.each(["claude", "codex"])(
@@ -378,7 +465,7 @@ describe("parseCcusageOutput", () => {
   it("fails closed when reasoning allocation gives tokens to an unpriced paid model", () => {
     const modelBreakdowns = [
       {
-        modelName: "priced-model",
+        modelName: "gpt-priced",
         inputTokens: 1,
         outputTokens: 0,
         cacheCreationTokens: 0,
@@ -387,7 +474,7 @@ describe("parseCcusageOutput", () => {
         cost: 0.1,
       },
       {
-        modelName: "aaa-unpriced-model",
+        modelName: "gpt-aaa-unpriced",
         inputTokens: 0,
         outputTokens: 0,
         cacheCreationTokens: 0,
@@ -398,7 +485,7 @@ describe("parseCcusageOutput", () => {
     ];
     expect(() => parseCcusageOutput(rawOutput([
       row({
-        modelsUsed: ["priced-model", "aaa-unpriced-model"],
+        modelsUsed: ["gpt-priced", "gpt-aaa-unpriced"],
         inputTokens: 1,
         outputTokens: 0,
         cacheCreationTokens: 0,
@@ -409,7 +496,7 @@ describe("parseCcusageOutput", () => {
         metadata: { agents: ["codex"] },
         agents: [{
           agent: "codex",
-          modelsUsed: ["priced-model", "aaa-unpriced-model"],
+          modelsUsed: ["gpt-priced", "gpt-aaa-unpriced"],
           inputTokens: 1,
           outputTokens: 0,
           cacheCreationTokens: 0,
@@ -420,48 +507,6 @@ describe("parseCcusageOutput", () => {
         }],
       }),
     ]))).toThrow(PricingUnavailableError);
-  });
-
-  it("allows a future source to report legitimately zero-cost usage", () => {
-    const parsed = parseCcusageOutput(rawOutput([
-      row({
-        modelsUsed: ["future-free-model"],
-        totalCost: 0,
-        modelBreakdowns: [{
-          modelName: "future-free-model",
-          inputTokens: 750,
-          outputTokens: 125,
-          cacheCreationTokens: 0,
-          cacheReadTokens: 250,
-          totalTokens: 1125,
-          cost: 0,
-        }],
-        metadata: { agents: ["future-agent"] },
-        agents: [{
-          agent: "future-agent",
-          modelsUsed: ["future-free-model"],
-          inputTokens: 750,
-          outputTokens: 125,
-          cacheCreationTokens: 0,
-          cacheReadTokens: 250,
-          totalTokens: 1200,
-          totalCost: 0,
-          modelBreakdowns: [{
-            modelName: "future-free-model",
-            inputTokens: 750,
-            outputTokens: 125,
-            cacheCreationTokens: 0,
-            cacheReadTokens: 250,
-            totalTokens: 1125,
-            cost: 0,
-          }],
-        }],
-      }),
-    ]));
-
-    expect(parsed.agents).toEqual(["future-agent"]);
-    expect(parsed.data[0]!.models).toEqual(["future-free-model"]);
-    expect(parsed.data[0]!.costUSD).toBe(0);
   });
 
   it("returns empty output for an empty ccusage daily array", () => {

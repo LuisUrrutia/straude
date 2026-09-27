@@ -2,9 +2,14 @@
 
 ## Unreleased
 
+### Removed
+
+- **Low-signal unit tests.** Delete 26 unit test files and trim individual tests from 27 more (about 3,100 lines) in `apps/web/__tests__` and `packages/cli/__tests__`. The removed tests echoed mocked Supabase rows back, pinned copy, markup or call counts, or repeated trivial input validation, so they broke on refactors without catching bugs. Tests for pricing math, auth and ownership, SSRF and URL validation, idempotency, rate limits, date edges and CLI parsing stay. `test:favicons` no longer lists the deleted `team-badge` unit test.
+
 ### Fixed
 
-- **Profile routes load when the server disables experimental `require(ESM)`.** Pin jsdom to 26.1.0, whose dependencies load under that restriction. The previous dependency graph threw `ERR_REQUIRE_ESM` before `/api/users/me` could authenticate either reads or settings saves. Browser coverage verifies unauthorized responses remain JSON. Direct SVG sanitization, PNG normalization and Google fallback are unchanged.
+- **Profile routes load when the server disables experimental `require(ESM)`.** Pin jsdom to 26.1.0, whose dependencies load under that restriction. The previous dependency graph threw `ERR_REQUIRE_ESM` before `/api/users/me` could authenticate either reads or settings saves. CI browser coverage runs under the same module restriction and verifies unauthorized responses remain JSON. A full email-signup and CLI-sync journey checks acquisition source/detail persistence after reload against local Supabase. Direct SVG sanitization, PNG normalization and Google fallback are unchanged.
+- **Unpriced third-party models no longer block `straude` pushes.** Codex or Claude Code sessions on a provider model with no LiteLLM price, such as `kimi-fast-latest`, stopped every push with `ccusage did not produce live pricing`. Usage from those models is now left out of the push without a message, and the rest of the day still syncs. Unpriced `claude-*`, `gpt-*` and o-series models still fail closed and retry, because those gaps close when LiteLLM adds the new model.
 
 - **Recover from interrupted first-sync setup.** Clipboard failures offer manual copying, failed usage checks have a retry action, and failed completion saves can be retried without repeating the sync. The success summary describes usage totals rather than treating daily usage rows as individual coding sessions.
 - **Keep CLI authorization open through sign-in and signup.** Magic links, GitHub sign-in, and login/signup navigation preserve a validated local return destination. A new account can return to the CLI authorization page before optional profile setup.
@@ -23,12 +28,16 @@
 
 ### Changed
 
+- **Make the acquisition question quicker to answer.** First-sync onboarding now offers one source choice and an optional detail for any choice. The shorter list keeps channel answers distinct, including search engines and AI assistants. Existing saved source keys and the profile API remain compatible.
+
 - **Show the first-sync command immediately after signup.** Onboarding opens with `npx straude@latest`, live usage checks, and privacy guidance. Handle and profile editing move to Settings. Users can explore the feed without marking onboarding complete; confirmed usage unlocks real stats and the completion step.
 
 - **Team favicons prefer organization sites with Google as a fallback.** Discovery prefers sanitized SVG from conventional paths, HTML icon links and web manifests. If direct discovery finds no usable image, the server requests Google's favicon endpoint. ICO links and bodies are excluded, with no ICO decoder dependency. Raster images become lossless PNG output inside 128×128 without enlargement or cropping. Downloads validate public IP destinations and pin each connection to its checked address, with bounded redirects, concurrency, bytes and deadlines. Reusing a downloaded URL preserves the byte limit of each consuming resource.
 - **Team favicon caching supports SVG, PNG and temporary misses.** A service-only `team_favicon_cache` table persists object paths and 15-minute retry times across requests. Existing PNG objects remain valid. Settings saves retain an unchanged team's resolved icon. The team field waits for hydration before accepting edits, preventing early text entry from being lost. Badges use direct Storage images with `object-fit: contain` so prepared PNGs avoid optimizer recompression.
 
 ### Added
+
+- **Capture how new users find Straude.** First-sync onboarding now ends with a multi-select "How did you hear about us?" step that stores every selected source in `users.heard_about_sources`. Choosing "Other" reveals an optional free-text detail kept in the existing `heard_about` column. Skip closes the step without writing anything. Apply `20260920120000_add_users_heard_about_sources.sql` before deploying.
 
 - **Repeatable favicon verification.** `bun run --cwd apps/web test:favicons` covers image processing, discovery, transport, cache, settings and badge behavior. The dedicated Supabase integration suite exercises real database/Storage writes; `e2e/team-favicon-save.spec.ts` verifies authenticated saves and browser rendering with temporary local fixtures. Apply `20260905120000_team_favicon_cache.sql` before deploying the resolver.
 
